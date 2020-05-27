@@ -2,6 +2,8 @@
 *.pyc
 .pytest_cache/
 .coverage
+build/
+dist/
 
 venv/
 .venv/
