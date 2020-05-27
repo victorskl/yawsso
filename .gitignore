@@ -1,0 +1,16 @@
+*.egg-info/
+*.pyc
+.pytest_cache/
+.coverage
+
+venv/
+.venv/
+env/
+.env/
+py35/
+py36/
+py37/
+py38/
+
+*.iml
+.idea/
