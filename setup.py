@@ -27,6 +27,12 @@ setup(
             "flake8",
             "mockito",
             "cli-test-helpers",
+            "nose2",
+        ],
+        "dev": [
+            "twine",
+            "setuptools",
+            "wheel",
         ],
     }
 )

@@ -1,6 +1,8 @@
 import json
 import tempfile
+import uuid
 from datetime import datetime, timedelta
+from random import randint
 from unittest import TestCase
 
 from cli_test_helpers import ArgvContext
@@ -53,6 +55,10 @@ class CLIUnitTests(TestCase):
         self.sso_cache_json.seek(0)
         self.sso_cache_json.read()
 
+        cli.AWS_CONFIG_PATH = self.config.name
+        cli.AWS_CREDENTIAL_PATH = self.credentials.name
+        cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+
     def tearDown(self) -> None:
         self.config.close()
         self.credentials.close()
@@ -62,10 +68,6 @@ class CLIUnitTests(TestCase):
 
     def test_main(self):
         with ArgvContext(program, '-p', 'dev', '--debug'):
-            cli.AWS_CONFIG_PATH = self.config.name
-            cli.AWS_CREDENTIAL_PATH = self.credentials.name
-            cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
-
             output = {
                 'roleCredentials':
                     {
@@ -88,3 +90,70 @@ class CLIUnitTests(TestCase):
             self.assertNotEqual(new_tok, 'tok')
             self.assertEqual(new_tok, 'VeryLongBase664String==')
             verify(cli, times=3).invoke(...)
+
+    def test_not_sso_profile(self):
+        with ArgvContext(program, '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [default]
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_invalid_bin(self):
+        with ArgvContext(program, '-b', f'/usr/local/bin/aws{randint(3, 9)}', '-d'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_profile_not_found(self):
+        with ArgvContext(program, '-p', uuid.uuid4().hex, '-d'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_config_not_found(self):
+        with ArgvContext(program, '-d'), self.assertRaises(SystemExit) as x:
+            cli.AWS_CONFIG_PATH = "mock.config"
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_credential_not_found(self):
+        with ArgvContext(program, '-d'), self.assertRaises(SystemExit) as x:
+            cli.AWS_CREDENTIAL_PATH = "mock.credentials"
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_sso_cache_not_found(self):
+        with ArgvContext(program, '-d'), self.assertRaises(SystemExit) as x:
+            cli.AWS_SSO_CACHE_PATH = "mock.sso.cache.json"
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_sso_cache_expires(self):
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.sso_cache_json.close()
+            self.sso_cache_dir.cleanup()
+            # start new test case
+            self.sso_cache_dir = tempfile.TemporaryDirectory()
+            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json')
+            cache_json = {
+                "startUrl": "https://petshop.awsapps.com/start",
+                "region": "ap-southeast-2",
+                "accessToken": "longTextA.AverylOngText",
+                "expiresAt": f"{str((datetime.utcnow()).isoformat())[:-7]}UTC"
+            }
+            self.sso_cache_json.write(json.dumps(cache_json).encode('utf-8'))
+            self.sso_cache_json.seek(0)
+            self.sso_cache_json.read()
+            cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
