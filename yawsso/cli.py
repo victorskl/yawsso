@@ -5,7 +5,7 @@ import os
 import shlex
 import shutil
 import subprocess
-from configparser import ConfigParser
+from configparser import ConfigParser, NoSectionError
 from datetime import datetime
 from pathlib import Path
 
@@ -56,6 +56,11 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     write_config(AWS_CREDENTIAL_PATH, config)
 
 
+def halt(error):
+    logger.error(error)
+    exit(1)
+
+
 def invoke(cmd):
     try:
         output = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT).decode()
@@ -97,26 +102,9 @@ def write_config(path, config):
 def main():
     logger.info(f"{yawsso.__name__} {yawsso.__version__}")
 
-    assert shutil.which('aws') is not None, f"Can not find `aws` command. Required AWS CLI v2."
-
-    cmd_aws_cli_version = "aws --version"
-    cli_success, cli_version_output = invoke(cmd_aws_cli_version)
-
-    if not cli_success:
-        logger.error(cli_version_output)
-
-    if "aws-cli/2" not in cli_version_output:
-        logger.error(f"Required AWS CLI v2. Found {cli_version_output}")
-        exit(1)
-
-    logger.info(cli_version_output)
-
-    assert os.path.exists(AWS_CONFIG_PATH), f"{AWS_CONFIG_PATH} does not exists"
-    assert os.path.exists(AWS_CREDENTIAL_PATH), f"{AWS_CREDENTIAL_PATH} does not exists"
-    assert os.path.exists(AWS_SSO_CACHE_PATH), f"{AWS_SSO_CACHE_PATH} does not exists"
-
     parser = argparse.ArgumentParser(prog=yawsso.__name__)
-    parser.add_argument("-p", "--profile")
+    parser.add_argument("-p", "--profile", help="AWS named profile", metavar='')
+    parser.add_argument("-b", "--bin", help="AWS CLI v2 binary location (default to `aws` in PATH)", metavar='')
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
     args = parser.parse_args()
 
@@ -129,45 +117,68 @@ def main():
         logger.debug(f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
         logger.debug(f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
 
+    aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
+
+    if args.bin:
+        aws_bin = args.bin
+
+    try:
+        assert shutil.which(aws_bin) is not None, f"Can not find AWS CLI v2 `{aws_bin}` command."
+        assert os.path.exists(AWS_CONFIG_PATH), f"{AWS_CONFIG_PATH} does not exists"
+        assert os.path.exists(AWS_CREDENTIAL_PATH), f"{AWS_CREDENTIAL_PATH} does not exists"
+        assert os.path.exists(AWS_SSO_CACHE_PATH), f"{AWS_SSO_CACHE_PATH} does not exists"
+    except AssertionError as e:
+        halt(e)
+
+    cmd_aws_cli_version = f"{aws_bin} --version"
+    cli_success, cli_version_output = invoke(cmd_aws_cli_version)
+
+    if not cli_success:
+        halt(cli_version_output)
+
+    if "aws-cli/2" not in cli_version_output:
+        halt(f"Required AWS CLI v2. Found {cli_version_output}")
+
+    logger.info(cli_version_output)
+
     profile_name = args.profile
+    profile = {}
 
     config = read_config(AWS_CONFIG_PATH)
 
-    if profile_name:
-        profile_opts = config.items(f"profile {profile_name}")
-    else:
-        profile_name = "default"
-        profile_opts = config.items(f"{profile_name}")
-
-    profile = dict(profile_opts)
+    try:
+        if profile_name:
+            profile_opts = config.items(f"profile {profile_name}")
+        else:
+            profile_name = "default"
+            profile_opts = config.items(f"{profile_name}")
+        profile = dict(profile_opts)
+    except NoSectionError as e:
+        halt(e)
 
     logger.debug(f"profile: {profile}")
 
     if "sso_start_url" not in profile or "sso_account_id" not in profile or "sso_role_name" not in profile:
-        logger.error(f"Your `{profile_name}` profile configuration is not valid AWS SSO profile. "
-                     f"Try `aws configure sso` first.")
-        exit(1)
+        halt(f"Your `{profile_name}` profile is not valid AWS SSO profile. Try `{aws_bin} configure sso` first.")
 
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
 
-    expires = datetime.strptime((cached_login["expiresAt"]), "%Y-%m-%dT%H:%M:%SUTC")
+    expires_utc = datetime.strptime((cached_login["expiresAt"]), "%Y-%m-%dT%H:%M:%SUTC")  # datetime format in sso cache
 
-    if datetime.utcnow() > expires:
-        logger.error(f"Current cached SSO login is already expired since {expires.astimezone().isoformat()}")
-        logger.info(f"Please try login again: `aws sso login --profile={profile_name}`")
-        exit(1)
+    if datetime.utcnow() > expires_utc:
+        halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
 
-    cmd_sts_get_caller_identity = f"aws sts get-caller-identity " \
+    cmd_sts_get_caller_identity = f"{aws_bin} sts get-caller-identity " \
                                   f"--output json " \
                                   f"--region {profile['sso_region']} " \
                                   f"--profile {profile_name}"
+
     caller_success, caller_output = invoke(cmd_sts_get_caller_identity)
 
     if not caller_success:
-        logger.error(caller_output)
-        exit(1)
+        halt(caller_output)
 
-    cmd_get_role_cred = f"aws sso get-role-credentials " \
+    cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
                         f"--output json " \
                         f"--profile {profile_name} " \
                         f"--region {profile['sso_region']} " \
@@ -178,11 +189,9 @@ def main():
     role_cred_success, role_cred_output = invoke(cmd_get_role_cred)
 
     if not role_cred_success:
-        logger.error(f"Error executing command: `aws sso get-role-credentials`. "
-                     f"Use --debug flag for more verbose output.")
         logger.debug(f"Command was: {cmd_get_role_cred}")
         logger.debug(f"Output  was: {role_cred_output}")
-        exit(1)
+        halt(f"Error executing command: `{aws_bin} sso get-role-credentials`.")
 
     credentials = json.loads(role_cred_output)['roleCredentials']
 
