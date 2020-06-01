@@ -217,4 +217,4 @@ def main():
 
         update_aws_cli_v1_credentials(profile_name, profile, credentials)
 
-        logger.info(f"Done syncing up AWS CLI v1 credentials using AWS CLI v2 SSO login session")
+        logger.info(f"Done syncing up AWS CLI v1 credentials using AWS CLI v2 SSO login session for " + str(profile_name))
