@@ -19,17 +19,18 @@ pip install yawsso
 - Do your per normal SSO login like so:
 ```commandline
 aws configure sso
-aws sso login --profile=dev
+aws sso login
 ```
 
-- To sync for `default` profile, just:
+- To sync for all profiles, just:
 ```commandline
 yawsso
 ```
 
-- To sync for named profile, do:
+- To sync for named profiles, do:
 ```commandline
-yawsso -p dev
+yawsso -p dev prod stage
+yawsso --profiles dev
 ```
 
 - Then, continue per normal with your daily tools. i.e. 
