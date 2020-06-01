@@ -59,6 +59,21 @@ class CLIUnitTests(TestCase):
         cli.AWS_CREDENTIAL_PATH = self.credentials.name
         cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
 
+        mock_output = {
+            'roleCredentials':
+                {
+                    'accessKeyId': '***REMOVED***',
+                    'secretAccessKey': '***REMOVED***',
+                    'sessionToken': 'VeryLongBase664String==',
+                    'expiration': datetime.utcnow().timestamp()
+                }
+        }
+        mock_success = True
+        mock_cli_v2 = 'aws-cli/2.0.9 Python/3.8.2 Darwin/19.4.0 botocore/2.0.0dev13 (MOCK)'
+        when(cli).invoke(contains('aws --version')).thenReturn((mock_success, mock_cli_v2))
+        when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((mock_success, 'does-not-matter'))
+        when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((mock_success, json.dumps(mock_output)))
+
     def tearDown(self) -> None:
         self.config.close()
         self.credentials.close()
@@ -68,23 +83,7 @@ class CLIUnitTests(TestCase):
 
     def test_main(self):
         with ArgvContext(program, '-p', 'dev', '--debug'):
-            output = {
-                'roleCredentials':
-                    {
-                        'accessKeyId': '***REMOVED***',
-                        'secretAccessKey': '***REMOVED***',
-                        'sessionToken': 'VeryLongBase664String==',
-                        'expiration': datetime.utcnow().timestamp()
-                    }
-            }
-            success = True
-            cli_v2 = 'aws-cli/2.0.9 Python/3.8.2 Darwin/19.4.0 botocore/2.0.0dev13 (MOCK)'
-            when(cli).invoke(contains('aws --version')).thenReturn((success, cli_v2))
-            when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((success, 'does-not-matter'))
-            when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((success, json.dumps(output)))
-
             cli.main()
-
             cred = cli.read_config(self.credentials.name)
             new_tok = cred['dev']['aws_session_token']
             self.assertNotEqual(new_tok, 'tok')
@@ -92,13 +91,13 @@ class CLIUnitTests(TestCase):
             verify(cli, times=3).invoke(...)
 
     def test_not_sso_profile(self):
-        with ArgvContext(program, '-d'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
             # now start new test case
             self.config = tempfile.NamedTemporaryFile()
             conf_ini = b"""
-            [default]
+            [profile dev]
             region = ap-southeast-2
             output = json
             """
@@ -155,5 +154,12 @@ class CLIUnitTests(TestCase):
             self.sso_cache_json.seek(0)
             self.sso_cache_json.read()
             cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_aws_cli_v1(self):
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+            mock_cli_v1 = 'aws-cli/1.18.61 Python/2.7.17 Linux/5.3.0-1020-azure botocore/1.16.11 (MOCK v1)'
+            when(cli).invoke(contains('aws --version')).thenReturn((True, mock_cli_v1))
             cli.main()
         self.assertEqual(x.exception.code, 1)

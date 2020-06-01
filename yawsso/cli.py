@@ -161,7 +161,7 @@ def main():
             if profile in config_profiles:
                 profiles.append(profile)
             else:
-                logger.error("%s is not specified in ~/.aws/config file. Please adjust the file and try again." % profile)
+                halt(f"{profile} is not specified in {AWS_CONFIG_PATH} file. Please adjust the file and try again.")
 
     for profile_name in profiles:
         profile = {}
