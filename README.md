@@ -1,6 +1,6 @@
 # yawsso
 
-![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)
+[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=master)](https://codecov.io/gh/victorskl/yawsso?branch=master)
 
 Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 credentials.
 
