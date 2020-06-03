@@ -33,8 +33,10 @@ def get_aws_cli_v2_sso_cached_login(profile):
 
         data = load_json(file_path)
         if data.get("startUrl") != profile["sso_start_url"]:
+            logger.debug(f"Not equal SSO start url, skip: {file_path}")
             continue
         if data.get("region") != profile["sso_region"]:
+            logger.debug(f"Not equal SSO region, skip: {file_path}")
             continue
         logger.debug(f"Using cached SSO login: {file_path}")
         return data
@@ -85,6 +87,7 @@ def load_json(path):
         with open(path) as context:
             return json.load(context)
     except ValueError:
+        logger.debug(f"Exception occur when loading JSON: {path}. Skip.")
         pass  # ignore invalid json
 
 
@@ -99,12 +102,79 @@ def write_config(path, config):
         config.write(destination)
 
 
+def update_profile(profile_name, config, aws_bin):
+    profile = {}
+
+    try:
+        if profile_name == "default":
+            profile_opts = config.items(f"{profile_name}")
+        else:
+            profile_opts = config.items(f"profile {profile_name}")
+        profile = dict(profile_opts)
+    except NoSectionError as e:
+        halt(e)
+
+    logger.debug(f"Syncing profile... {profile_name}: {profile}")
+
+    if "sso_start_url" not in profile or "sso_account_id" not in profile or "sso_role_name" not in profile:
+        halt(f"Your `{profile_name}` profile is not valid AWS SSO profile. Try `{aws_bin} configure sso` first.")
+
+    cached_login = get_aws_cli_v2_sso_cached_login(profile)
+    try:
+        assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {AWS_SSO_CACHE_PATH}."
+    except AssertionError as e:
+        halt(e)
+
+    expires_utc = datetime.strptime((cached_login["expiresAt"]), "%Y-%m-%dT%H:%M:%SUTC")  # datetime format in sso cache
+
+    if datetime.utcnow() > expires_utc:
+        halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
+
+    cmd_sts_get_caller_identity = f"{aws_bin} sts get-caller-identity " \
+                                  f"--output json " \
+                                  f"--region {profile['sso_region']} " \
+                                  f"--profile {profile_name}"
+
+    caller_success, caller_output = invoke(cmd_sts_get_caller_identity)
+
+    if not caller_success:
+        halt(f"Error executing command: `{aws_bin} sts get-caller-identity`. Exception: {caller_output}")
+
+    cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
+                        f"--output json " \
+                        f"--profile {profile_name} " \
+                        f"--region {profile['sso_region']} " \
+                        f"--role-name {profile['sso_role_name']} " \
+                        f"--account-id {profile['sso_account_id']} " \
+                        f"--access-token {cached_login['accessToken']}"
+
+    role_cred_success, role_cred_output = invoke(cmd_get_role_cred)
+
+    if not role_cred_success:
+        logger.debug(f"Command was: {cmd_get_role_cred}")
+        logger.debug(f"Output  was: {role_cred_output}")
+        halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Exception: {role_cred_output}")
+
+    credentials = json.loads(role_cred_output)['roleCredentials']
+
+    update_aws_cli_v1_credentials(profile_name, profile, credentials)
+
+    logger.info(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for `{profile_name}` profile")
+
+
 def main():
     logger.info(f"{yawsso.__name__} {yawsso.__version__}")
 
     parser = argparse.ArgumentParser(prog=yawsso.__name__)
-    parser.add_argument("-p", "--profiles", nargs='*', help="AWS profile credentials to update in \"~/.aws/credentials\"", metavar='')
-    parser.add_argument("-b", "--bin", help="AWS CLI v2 binary location (default to `aws` in PATH)", metavar='')
+    parser.add_argument(
+        "--default", action="store_true",
+        help=f"AWS default profile (i.e. Update default profile credentials in {AWS_CREDENTIAL_PATH})"
+    )
+    parser.add_argument(
+        "-p", "--profiles", nargs='*', metavar='',
+        help=f"AWS named profiles (i.e. Update named profiles credentials in {AWS_CREDENTIAL_PATH})"
+    )
+    parser.add_argument("-b", "--bin", metavar='', help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
     args = parser.parse_args()
 
@@ -134,7 +204,7 @@ def main():
     cli_success, cli_version_output = invoke(cmd_aws_cli_version)
 
     if not cli_success:
-        halt(cli_version_output)
+        halt(f"Error executing command: `{aws_bin} --version`. Exception: {cli_version_output}")
 
     if "aws-cli/2" not in cli_version_output:
         halt(f"Required AWS CLI v2. Found {cli_version_output}")
@@ -143,78 +213,21 @@ def main():
 
     config = read_config(AWS_CONFIG_PATH)
 
-    config_profiles = []
-    
-    for profile in config.sections():
-        if profile=='default':
-            continue
-        else: 
-            profile = profile.replace("profile ", "")
-        config_profiles.append(profile)
+    if args.default:  # Specific flag to take care of default profile
+        update_profile("default", config, aws_bin)
 
-    logger.info("Current profiles in config: " + str(config_profiles))
-    if args.profiles is None: ### Default to all profiles in ~/.aws/config file
-        profiles=config_profiles
-    else: ### Check if the profiles listed are in ~/.aws/config file
-        profiles=[]
-        for profile in args.profiles:
-            if profile in config_profiles:
-                profiles.append(profile)
+    named_profiles = list(map(lambda p: p.replace("profile ", ""), filter(lambda s: s != "default", config.sections())))
+    logger.info(f"Current named profiles in config: {str(named_profiles)}")
+
+    profiles = named_profiles  # When no args pass, update all named profiles in ~/.aws/config file
+
+    if args.profiles:  # Check if the profiles listed are in ~/.aws/config file
+        profiles = []
+        for np in args.profiles:
+            if np in named_profiles:
+                profiles.append(np)
             else:
-                halt(f"{profile} is not specified in {AWS_CONFIG_PATH} file. Please adjust the file and try again.")
+                halt(f"Named profile `{np}` is not specified in {AWS_CONFIG_PATH} file.")
 
     for profile_name in profiles:
-        profile = {}
-
-        try:
-            if profile_name:
-                profile_opts = config.items(f"profile {profile_name}")
-            else:
-                profile_name = "default"
-                profile_opts = config.items(f"{profile_name}")
-            profile = dict(profile_opts)
-        except NoSectionError as e:
-            halt(e)
-
-        logger.debug(f"profile: {profile}")
-
-        if "sso_start_url" not in profile or "sso_account_id" not in profile or "sso_role_name" not in profile:
-            halt(f"Your `{profile_name}` profile is not valid AWS SSO profile. Try `{aws_bin} configure sso` first.")
-
-        cached_login = get_aws_cli_v2_sso_cached_login(profile)
-
-        expires_utc = datetime.strptime((cached_login["expiresAt"]), "%Y-%m-%dT%H:%M:%SUTC")  # datetime format in sso cache
-
-        if datetime.utcnow() > expires_utc:
-            halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
-
-        cmd_sts_get_caller_identity = f"{aws_bin} sts get-caller-identity " \
-                                    f"--output json " \
-                                    f"--region {profile['sso_region']} " \
-                                    f"--profile {profile_name}"
-
-        caller_success, caller_output = invoke(cmd_sts_get_caller_identity)
-
-        if not caller_success:
-            halt(caller_output)
-
-        cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
-                            f"--output json " \
-                            f"--profile {profile_name} " \
-                            f"--region {profile['sso_region']} " \
-                            f"--role-name {profile['sso_role_name']} " \
-                            f"--account-id {profile['sso_account_id']} " \
-                            f"--access-token {cached_login['accessToken']}"
-
-        role_cred_success, role_cred_output = invoke(cmd_get_role_cred)
-
-        if not role_cred_success:
-            logger.debug(f"Command was: {cmd_get_role_cred}")
-            logger.debug(f"Output  was: {role_cred_output}")
-            halt(f"Error executing command: `{aws_bin} sso get-role-credentials`.")
-
-        credentials = json.loads(role_cred_output)['roleCredentials']
-
-        update_aws_cli_v1_credentials(profile_name, profile, credentials)
-
-        logger.info(f"Done syncing up AWS CLI v1 credentials using AWS CLI v2 SSO login session for " + str(profile_name))
+        update_profile(profile_name, config, aws_bin)

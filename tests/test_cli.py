@@ -8,6 +8,7 @@ from unittest import TestCase
 from cli_test_helpers import ArgvContext
 from mockito import unstub, when, contains, verify
 
+from . import logger
 from yawsso import cli
 
 program = 'yawsso'
@@ -161,5 +162,143 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
             mock_cli_v1 = 'aws-cli/1.18.61 Python/2.7.17 Linux/5.3.0-1020-azure botocore/1.16.11 (MOCK v1)'
             when(cli).invoke(contains('aws --version')).thenReturn((True, mock_cli_v1))
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_default_profile(self):
+        with ArgvContext(program, '--default', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [default]
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_no_such_profile_section(self):
+        with ArgvContext(program, '--default', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [profile default]
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_sso_cache_not_json(self):
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.sso_cache_json.close()
+            self.sso_cache_dir.cleanup()
+            # start new test case
+            self.sso_cache_dir = tempfile.TemporaryDirectory()
+            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.txt')
+            self.sso_cache_json.seek(0)
+            self.sso_cache_json.read()
+            cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_not_equal_sso_start_url(self):
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [profile dev]
+            sso_start_url = https://vetclinic.awsapps.com/start
+            sso_region = ap-southeast-2
+            sso_account_id = 123456789
+            sso_role_name = AdministratorAccess
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_not_equal_sso_region(self):
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [profile dev]
+            sso_start_url = https://petshop.awsapps.com/start
+            sso_region = us-east-2
+            sso_account_id = 123456789
+            sso_role_name = AdministratorAccess
+            region = us-east-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_invoke_cmd_fail(self):
+        unstub()
+        success, output = cli.invoke(f"cd {uuid.uuid4().hex}")
+        logger.info(output)
+        self.assertTrue(not success)
+
+    def test_invoke_cmd_success(self):
+        unstub()
+        success, output = cli.invoke(f"which cd")
+        logger.info(output)
+        self.assertTrue(success)
+
+    def test_load_json_value_error(self):
+        # clean up as going to mutate this
+        self.sso_cache_json.close()
+        self.sso_cache_dir.cleanup()
+        # start new test case
+        self.sso_cache_dir = tempfile.TemporaryDirectory()
+        self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json')
+        self.sso_cache_json.write('{}{}'.encode('utf-8'))
+        self.sso_cache_json.seek(0)
+        self.sso_cache_json.read()
+        output = cli.load_json(self.sso_cache_json.name)
+        logger.info(output)
+        self.assertIsNone(output)
+
+    def test_sts_get_caller_identity_fail(self):
+        when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((False, 'does-not-matter'))
+        with self.assertRaises(SystemExit) as x:
+            cli.update_profile("dev", cli.read_config(self.config.name), "aws")
+        self.assertEqual(x.exception.code, 1)
+
+    def test_sso_get_role_credentials_fail(self):
+        when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((False, 'does-not-matter'))
+        with self.assertRaises(SystemExit) as x:
+            cli.update_profile("dev", cli.read_config(self.config.name), "aws")
+        self.assertEqual(x.exception.code, 1)
+
+    def test_aws_cli_version_fail(self):
+        when(cli).invoke(contains('aws --version')).thenReturn((False, 'does-not-matter'))
+        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 1)

@@ -16,29 +16,43 @@ Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 cred
 pip install yawsso
 ```
 
-- Do your per normal SSO login like so:
+- Do your per normal SSO login and, have those SSO login session cache like so:
 ```commandline
-aws configure sso
-aws sso login
+aws sso login --profile=dev
+aws sso login --profile=prod
+aws sso login --profile=stag
 ```
 
-- To sync for all profiles, just:
+- To sync for all named profiles (e.g. dev, prod, stag), then just:
 ```commandline
 yawsso
 ```
 
-- To sync for named profiles, do:
+- To sync default profile, do:
 ```commandline
-yawsso -p dev prod stage
-yawsso --profiles dev
+yawsso --default
+```
+
+- To sync for selected named profile, do:
+```commandline
+yawsso -p dev
+```
+
+- To sync for multiple selected named profiles, do:
+```commandline
+yawsso -p dev prod
+```
+
+- To sync for default profile as well as multiple named profiles, do:
+```commandline
+yawsso --default -p dev prod
 ```
 
 - Then, continue per normal with your daily tools. i.e. 
-    - `cdk deploy ...` or
-    - `terraform ...` or
-    - `cw ls -p dev groups` or
+    - `cdk deploy ...`
+    - `terraform ...`
+    - `cw ls -p dev groups`
     - `awsbw -L -P dev` 
-    - so on so ford...
 
 - To print help:
 ```commandline
