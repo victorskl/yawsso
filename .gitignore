@@ -2,6 +2,7 @@
 *.pyc
 .pytest_cache/
 .coverage
+coverage.xml
 build/
 dist/
 
