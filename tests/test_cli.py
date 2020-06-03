@@ -261,13 +261,13 @@ class CLIUnitTests(TestCase):
 
     def test_invoke_cmd_fail(self):
         unstub()
-        success, output = cli.invoke(f"cd {uuid.uuid4().hex}")
+        success, output = cli.invoke(f"aws sts get-caller-identity")  # FIXME need to run under unauthenticated test env
         logger.info(output)
         self.assertTrue(not success)
 
     def test_invoke_cmd_success(self):
         unstub()
-        success, output = cli.invoke(f"which cd")
+        success, output = cli.invoke(f"aws --version")
         logger.info(output)
         self.assertTrue(success)
 
