@@ -3,6 +3,7 @@
 .pytest_cache/
 .coverage
 coverage.xml
+local/
 build/
 dist/
 

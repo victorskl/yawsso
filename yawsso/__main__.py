@@ -1,2 +1,2 @@
-from yawsso.cli import main
-main()
+from yawsso.cli import main  # pragma: no cover
+main()  # pragma: no cover
