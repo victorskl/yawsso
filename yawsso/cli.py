@@ -102,23 +102,7 @@ def write_config(path, config):
         config.write(destination)
 
 
-def update_profile(profile_name, config, aws_bin):
-    profile = {}
-
-    try:
-        if profile_name == "default":
-            profile_opts = config.items(f"{profile_name}")
-        else:
-            profile_opts = config.items(f"profile {profile_name}")
-        profile = dict(profile_opts)
-    except NoSectionError as e:
-        halt(e)
-
-    logger.debug(f"Syncing profile... {profile_name}: {profile}")
-
-    if "sso_start_url" not in profile or "sso_account_id" not in profile or "sso_role_name" not in profile:
-        halt(f"Your `{profile_name}` profile is not valid AWS SSO profile. Try `{aws_bin} configure sso` first.")
-
+def fetch_credentials(profile_name, profile, aws_bin):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
     try:
         assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {AWS_SSO_CACHE_PATH}."
@@ -155,25 +139,57 @@ def update_profile(profile_name, config, aws_bin):
         logger.debug(f"Output  was: {role_cred_output}")
         halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Exception: {role_cred_output}")
 
-    credentials = json.loads(role_cred_output)['roleCredentials']
+    return json.loads(role_cred_output)['roleCredentials']
+
+
+def load_profile_from_config(profile_name, config):
+    try:
+        if profile_name == "default":
+            profile_opts = config.items(f"{profile_name}")
+        else:
+            profile_opts = config.items(f"profile {profile_name}")
+        return dict(profile_opts)
+    except NoSectionError as e:
+        halt(e)
+
+
+def is_sso_profile(profile):
+    return {"sso_start_url", "sso_account_id", "sso_role_name", "sso_region"} <= profile.keys()
+
+
+def update_profile(profile_name, config, aws_bin):
+    profile = load_profile_from_config(profile_name, config)
+
+    logger.debug(f"Syncing profile... {profile_name}: {profile}")
+
+    if is_sso_profile(profile):
+        credentials = fetch_credentials(profile_name, profile, aws_bin)
+
+    elif "source_profile" in profile:
+        source_profile_name = profile['source_profile']
+        source_profile = load_profile_from_config(source_profile_name, config)
+        if not is_sso_profile(source_profile):
+            logger.warning(f"Your source_profile is not an AWS SSO profile. Skip syncing profile `{profile_name}`")
+            return
+        logger.debug(f"Fetching credentials using source_profile `{source_profile_name}`")
+        credentials = fetch_credentials(source_profile_name, source_profile, aws_bin)
+
+    else:
+        logger.warning(f"Not an AWS SSO profile nor no source_profile found. Skip syncing profile `{profile_name}`")
+        return
 
     update_aws_cli_v1_credentials(profile_name, profile, credentials)
 
-    logger.info(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for `{profile_name}` profile")
+    logger.info(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
 
 
 def main():
     logger.info(f"{yawsso.__name__} {yawsso.__version__}")
-
-    parser = argparse.ArgumentParser(prog=yawsso.__name__)
-    parser.add_argument(
-        "--default", action="store_true",
-        help=f"AWS default profile (i.e. Update default profile credentials in {AWS_CREDENTIAL_PATH})"
-    )
-    parser.add_argument(
-        "-p", "--profiles", nargs='*', metavar='',
-        help=f"AWS named profiles (i.e. Update named profiles credentials in {AWS_CREDENTIAL_PATH})"
-    )
+    description = "Sync all named profiles when calling without any arguments"
+    parser = argparse.ArgumentParser(prog=yawsso.__name__, description=description)
+    parser.add_argument("--default", action="store_true", help=f"Sync AWS default profile and all named profiles")
+    parser.add_argument("--default-only", action="store_true", help=f"Sync AWS default profile only and exit")
+    parser.add_argument("-p", "--profiles", nargs='*', metavar='', help=f"Sync specified AWS named profiles")
     parser.add_argument("-b", "--bin", metavar='', help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
     args = parser.parse_args()
@@ -213,11 +229,14 @@ def main():
 
     config = read_config(AWS_CONFIG_PATH)
 
-    if args.default:  # Specific flag to take care of default profile
+    if args.default or args.default_only:  # Specific flag to take care of default profile
         update_profile("default", config, aws_bin)
+        if args.default_only:
+            exit(0)
 
     named_profiles = list(map(lambda p: p.replace("profile ", ""), filter(lambda s: s != "default", config.sections())))
-    logger.info(f"Current named profiles in config: {str(named_profiles)}")
+    if len(named_profiles) > 0:
+        logger.info(f"Current named profiles in config: {str(named_profiles)}")
 
     profiles = named_profiles  # When no args pass, update all named profiles in ~/.aws/config file
 

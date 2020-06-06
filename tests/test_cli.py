@@ -92,7 +92,7 @@ class CLIUnitTests(TestCase):
             verify(cli, times=3).invoke(...)
 
     def test_not_sso_profile(self):
-        with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '-p', 'dev', '-d'):
             # clean up as going to mutate this
             self.config.close()
             # now start new test case
@@ -107,7 +107,10 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.AWS_CONFIG_PATH = self.config.name
             cli.main()
-        self.assertEqual(x.exception.code, 1)
+        cred = cli.read_config(self.credentials.name)
+        tok_now = cred['dev']['aws_session_token']
+        self.assertEqual(tok_now, 'tok')  # assert no update
+        verify(cli, times=1).invoke(...)
 
     def test_invalid_bin(self):
         with ArgvContext(program, '-b', f'/usr/local/bin/aws{randint(3, 9)}', '-d'), self.assertRaises(SystemExit) as x:
@@ -166,7 +169,7 @@ class CLIUnitTests(TestCase):
         self.assertEqual(x.exception.code, 1)
 
     def test_default_profile(self):
-        with ArgvContext(program, '--default', '-d'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '--default-only', '-d'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
             # now start new test case
@@ -181,7 +184,7 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.AWS_CONFIG_PATH = self.config.name
             cli.main()
-        self.assertEqual(x.exception.code, 1)
+        self.assertEqual(x.exception.code, 0)
 
     def test_no_such_profile_section(self):
         with ArgvContext(program, '--default', '-d'), self.assertRaises(SystemExit) as x:
@@ -302,3 +305,74 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-d'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 1)
+
+    def test_source_profile(self):
+        with ArgvContext(program, '-d'):
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [default]
+            sso_start_url = https://petshop.awsapps.com/start
+            sso_region = ap-southeast-2
+            sso_account_id = 123456789
+            sso_role_name = Engineering
+            region = ap-southeast-2
+            output = json
+            
+            [profile dev]
+            role_arn = arn:aws:iam::456789123:role/FullAdmin
+            source_profile = default
+            region = ap-southeast-2
+            output = json
+            
+            [profile qc]
+            role_arn = arn:aws:iam::789123456:role/FullAdmin
+            source_profile = default
+            region = ap-southeast-2
+            output = json
+            
+            [profile prod]
+            role_arn = arn:aws:iam::987654321:role/DevOps
+            source_profile = default
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli, times=7).invoke(...)
+
+    def test_source_profile_not_sso(self):
+        with ArgvContext(program, '-d'):
+            # clean up as going to mutate this
+            self.config.close()
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile()
+            conf_ini = b"""
+            [default]
+            region = ap-southeast-2
+            output = json
+
+            [profile dev]
+            role_arn = arn:aws:iam::456789123:role/FullAdmin
+            source_profile = default
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.AWS_CONFIG_PATH = self.config.name
+            cli.main()
+        cred = cli.read_config(self.credentials.name)
+        tok_now = cred['dev']['aws_session_token']
+        self.assertEqual(tok_now, 'tok')  # assert no update
+        verify(cli, times=1).invoke(...)
