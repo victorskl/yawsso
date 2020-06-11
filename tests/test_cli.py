@@ -291,13 +291,13 @@ class CLIUnitTests(TestCase):
     def test_sts_get_caller_identity_fail(self):
         when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((False, 'does-not-matter'))
         with self.assertRaises(SystemExit) as x:
-            cli.update_profile("dev", cli.read_config(self.config.name), "aws", false)
+            cli.update_profile("dev", cli.read_config(self.config.name), "aws", False)
         self.assertEqual(x.exception.code, 1)
 
     def test_sso_get_role_credentials_fail(self):
         when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((False, 'does-not-matter'))
         with self.assertRaises(SystemExit) as x:
-            cli.update_profile("dev", cli.read_config(self.config.name), "aws", false)
+            cli.update_profile("dev", cli.read_config(self.config.name), "aws", False)
         self.assertEqual(x.exception.code, 1)
 
     def test_aws_cli_version_fail(self):
