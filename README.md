@@ -54,6 +54,15 @@ yawsso --default -p dev prod
     - `cw ls -p dev groups`
     - `awsbw -L -P dev` 
 
+- Or if you want a temporary copy-pasteable time-gated access token for an instance or external machine. Please use this feature with care since **environment variables used on shared systems can give unauthorized access to private resources**:
+
+```commandline
+yawsso -e
+export AWS_ACCESS_KEY_ID=ASIAFOOBARFOOBAR
+export AWS_SECRET_ACCESS_KEY=BAZBARBAZBAR
+export AWS_SESSION_TOKEN=LOREMIPSUMDOLOR
+```
+
 - To print help:
 ```commandline
 yawsso -h
