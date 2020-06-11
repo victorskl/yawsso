@@ -58,6 +58,11 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     write_config(AWS_CREDENTIAL_PATH, config)
 
 
+def print_export_vars(credentials):
+    print(f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}")
+    print(f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}")
+    print(f"export AWS_SESSION_TOKEN={credentials['sessionToken']}")
+
 def halt(error):
     logger.error(error)
     exit(1)
@@ -157,7 +162,7 @@ def is_sso_profile(profile):
     return {"sso_start_url", "sso_account_id", "sso_role_name", "sso_region"} <= profile.keys()
 
 
-def update_profile(profile_name, config, aws_bin):
+def update_profile(profile_name, config, aws_bin, exportvars):
     profile = load_profile_from_config(profile_name, config)
 
     logger.debug(f"Syncing profile... {profile_name}: {profile}")
@@ -178,6 +183,10 @@ def update_profile(profile_name, config, aws_bin):
         logger.warning(f"Not an AWS SSO profile nor no source_profile found. Skip syncing profile `{profile_name}`")
         return
 
+    logger.info(f"Printing export statements for profile {profile}:\n")
+    if exportvars:
+        print_export_vars(credentials)
+
     update_aws_cli_v1_credentials(profile_name, profile, credentials)
 
     logger.info(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
@@ -192,6 +201,7 @@ def main():
     parser.add_argument("-p", "--profiles", nargs='*', metavar='', help=f"Sync specified AWS named profiles")
     parser.add_argument("-b", "--bin", metavar='', help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
+    parser.add_argument("-e", "--exportvars", help="Print out copy-pasteable export AWS env vars", action="store_true")
     args = parser.parse_args()
 
     if args.debug:
@@ -202,6 +212,8 @@ def main():
         logger.debug(f"AWS_CREDENTIAL_PATH: {AWS_CREDENTIAL_PATH}")
         logger.debug(f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
         logger.debug(f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
+        if args.exportvars:
+            logger.debug("AWS variables will be printed as export statements")
 
     aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
 
@@ -230,7 +242,7 @@ def main():
     config = read_config(AWS_CONFIG_PATH)
 
     if args.default or args.default_only:  # Specific flag to take care of default profile
-        update_profile("default", config, aws_bin)
+        update_profile("default", config, aws_bin, args.exportvars)
         if args.default_only:
             exit(0)
 
@@ -249,4 +261,4 @@ def main():
                 halt(f"Named profile `{np}` is not specified in {AWS_CONFIG_PATH} file.")
 
     for profile_name in profiles:
-        update_profile(profile_name, config, aws_bin)
+        update_profile(profile_name, config, aws_bin, args.exportvars)
