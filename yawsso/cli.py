@@ -6,7 +6,7 @@ import shlex
 import shutil
 import subprocess
 from configparser import ConfigParser, NoSectionError
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yawsso
@@ -107,14 +107,31 @@ def write_config(path, config):
         config.write(destination)
 
 
-def fetch_credentials(profile_name, profile, aws_bin):
+def parse_sso_cached_login_expiry(cached_login):
+    datetime_format_in_sso_cached_login = "%Y-%m-%dT%H:%M:%SUTC"
+    expires_utc = datetime.strptime((cached_login["expiresAt"]), datetime_format_in_sso_cached_login)
+    return expires_utc
+
+
+def parse_assume_role_credentials_expiry(dt_str):
+    datetime_format_in_assume_role_expiration = "%Y-%m-%dT%H:%M:%S+00:00"
+    expires_utc = datetime.strptime(dt_str, datetime_format_in_assume_role_expiration)
+    return expires_utc
+
+
+def parse_role_name_from_role_arn(role_arn):
+    arr = role_arn.split('/')
+    return arr[len(arr)-1]
+
+
+def check_sso_cached_login_expires(profile_name, profile, aws_bin):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
     try:
         assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {AWS_SSO_CACHE_PATH}."
     except AssertionError as e:
         halt(e)
 
-    expires_utc = datetime.strptime((cached_login["expiresAt"]), "%Y-%m-%dT%H:%M:%SUTC")  # datetime format in sso cache
+    expires_utc = parse_sso_cached_login_expiry(cached_login)
 
     if datetime.utcnow() > expires_utc:
         halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
@@ -128,6 +145,12 @@ def fetch_credentials(profile_name, profile, aws_bin):
 
     if not caller_success:
         halt(f"Error executing command: `{aws_bin} sts get-caller-identity`. Exception: {caller_output}")
+
+    return cached_login
+
+
+def fetch_credentials(profile_name, profile, aws_bin):
+    cached_login = check_sso_cached_login_expires(profile_name, profile, aws_bin)
 
     cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
                         f"--output json " \
@@ -147,6 +170,54 @@ def fetch_credentials(profile_name, profile, aws_bin):
     return json.loads(role_cred_output)['roleCredentials']
 
 
+def fetch_credentials_with_assume_role(profile_name, profile, aws_bin):
+    role_name = parse_role_name_from_role_arn(profile['role_arn'])
+
+    cmd_get_role = f"{aws_bin} iam get-role " \
+                   f"--output json " \
+                   f"--profile {profile_name} " \
+                   f"--role-name {role_name} " \
+                   f"--region {profile['region']}"
+
+    get_role_success, get_role_output = invoke(cmd_get_role)
+
+    if not get_role_success:
+        logger.debug(f"Command was: {cmd_get_role}")
+        logger.debug(f"Output  was: {get_role_output}")
+        halt(f"Error executing command: `{aws_bin} iam get-role`. Exception: {get_role_output}")
+
+    duration_seconds = json.loads(get_role_output)['Role']['MaxSessionDuration']
+
+    utc_now_ts = int(datetime.utcnow().replace(tzinfo=timezone.utc).timestamp())
+    cmd_assume_role_cred = f"{aws_bin} sts assume-role " \
+                           f"--output json " \
+                           f"--profile {profile_name} " \
+                           f"--role-arn {profile['role_arn']} " \
+                           f"--role-session-name yawsso-session-{utc_now_ts} " \
+                           f"--duration-seconds {duration_seconds} " \
+                           f"--region {profile['region']}"
+
+    role_cred_success, role_cred_output = invoke(cmd_assume_role_cred)
+
+    if not role_cred_success:
+        logger.debug(f"Command was: {cmd_assume_role_cred}")
+        logger.debug(f"Output  was: {role_cred_output}")
+        halt(f"Error executing command: `{aws_bin} sts assume-role`. Exception: {role_cred_output}")
+
+    assume_role_cred = json.loads(role_cred_output)['Credentials']
+
+    _cred = {}
+    _cred.update(accessKeyId=assume_role_cred['AccessKeyId'])
+    _cred.update(secretAccessKey=assume_role_cred['SecretAccessKey'])
+    _cred.update(sessionToken=assume_role_cred['SessionToken'])
+
+    _expire_utc = parse_assume_role_credentials_expiry(assume_role_cred['Expiration'])
+    _expire_utc_ts_millisecond = int(_expire_utc.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    _cred.update(expiration=_expire_utc_ts_millisecond)
+
+    return _cred
+
+
 def load_profile_from_config(profile_name, config):
     try:
         if profile_name == "default":
@@ -162,6 +233,10 @@ def is_sso_profile(profile):
     return {"sso_start_url", "sso_account_id", "sso_role_name", "sso_region"} <= profile.keys()
 
 
+def is_source_profile(profile):
+    return {"source_profile", "role_arn", "region"} <= profile.keys()
+
+
 def update_profile(profile_name, config, aws_bin, exportvars):
     profile = load_profile_from_config(profile_name, config)
 
@@ -170,14 +245,18 @@ def update_profile(profile_name, config, aws_bin, exportvars):
     if is_sso_profile(profile):
         credentials = fetch_credentials(profile_name, profile, aws_bin)
 
-    elif "source_profile" in profile:
+    elif is_source_profile(profile):
         source_profile_name = profile['source_profile']
         source_profile = load_profile_from_config(source_profile_name, config)
         if not is_sso_profile(source_profile):
             logger.warning(f"Your source_profile is not an AWS SSO profile. Skip syncing profile `{profile_name}`")
             return
-        logger.debug(f"Fetching credentials using source_profile `{source_profile_name}`")
-        credentials = fetch_credentials(source_profile_name, source_profile, aws_bin)
+        if profile['region'] != source_profile['sso_region']:
+            logger.warning(f"Region mismatch with source_profile AWS SSO region. Skip syncing profile `{profile_name}`")
+            return
+        check_sso_cached_login_expires(source_profile_name, source_profile, aws_bin)
+        logger.debug(f"Fetching credentials using assume role for `{profile_name}`")
+        credentials = fetch_credentials_with_assume_role(profile_name, profile, aws_bin)
 
     else:
         logger.warning(f"Not an AWS SSO profile nor no source_profile found. Skip syncing profile `{profile_name}`")
