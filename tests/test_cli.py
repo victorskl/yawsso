@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import uuid
 from datetime import datetime, timedelta
@@ -8,8 +9,8 @@ from unittest import TestCase
 from cli_test_helpers import ArgvContext
 from mockito import unstub, when, contains, verify
 
-from . import logger
 from yawsso import cli
+from . import logger
 
 program = 'yawsso'
 
@@ -63,17 +64,60 @@ class CLIUnitTests(TestCase):
         mock_output = {
             'roleCredentials':
                 {
-                    'accessKeyId': 'AAAA4IGTCPYNIZGVJCVW',
-                    'secretAccessKey': '00GGc0cDG6WzbJIcDlw/gh0BaMOCKK0M/qDtDxR1',
+                    'accessKeyId': 'does-not-matter',
+                    'secretAccessKey': 'does-not-matter',
                     'sessionToken': 'VeryLongBase664String==',
                     'expiration': datetime.utcnow().timestamp()
                 }
         }
+
+        mock_assume_role = {
+            "Credentials": {
+                "AccessKeyId": "does-not-matter",
+                "SecretAccessKey": "does-not-matter",
+                "SessionToken": "VeryLongBase664String==",
+                "Expiration": "2020-06-13T17:15:23+00:00"
+            },
+            "AssumedRoleUser": {
+                "AssumedRoleId": "does-not-matter:yawsso-session-1",
+                "Arn": "arn:aws:sts::456789123:assumed-role/FullAdmin/yawsso-session-1"
+            }
+        }
+
+        mock_get_role = {
+            "Role": {
+                "Path": "/",
+                "RoleName": "FullAdmin",
+                "RoleId": "does-not-matter",
+                "Arn": "arn:aws:iam::456789123:role/FullAdmin",
+                "CreateDate": "2019-04-29T04:40:43+00:00",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": "arn:aws:iam::123456789:root"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "MaxSessionDuration": 3600,
+                "RoleLastUsed": {
+                    "LastUsedDate": "2020-06-14T02:27:18+00:00",
+                    "Region": "ap-southeast-2"
+                }
+            }
+        }
+
         mock_success = True
         mock_cli_v2 = 'aws-cli/2.0.9 Python/3.8.2 Darwin/19.4.0 botocore/2.0.0dev13 (MOCK)'
         when(cli).invoke(contains('aws --version')).thenReturn((mock_success, mock_cli_v2))
         when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((mock_success, 'does-not-matter'))
         when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((mock_success, json.dumps(mock_output)))
+        when(cli).invoke(contains('aws iam get-role')).thenReturn((mock_success, json.dumps(mock_get_role)))
+        when(cli).invoke(contains('aws sts assume-role')).thenReturn((mock_success, json.dumps(mock_assume_role)))
 
     def tearDown(self) -> None:
         self.config.close()
@@ -264,7 +308,9 @@ class CLIUnitTests(TestCase):
 
     def test_invoke_cmd_fail(self):
         unstub()
-        success, output = cli.invoke(f"aws sts get-caller-identity")  # FIXME need to run under unauthenticated test env
+        if os.getenv('AWS_PROFILE'):
+            del os.environ['AWS_PROFILE']
+        success, output = cli.invoke(f"aws sts get-caller-identity")
         logger.info(output)
         self.assertTrue(not success)
 
@@ -326,18 +372,6 @@ class CLIUnitTests(TestCase):
             source_profile = default
             region = ap-southeast-2
             output = json
-            
-            [profile qc]
-            role_arn = arn:aws:iam::789123456:role/FullAdmin
-            source_profile = default
-            region = ap-southeast-2
-            output = json
-            
-            [profile prod]
-            role_arn = arn:aws:iam::987654321:role/DevOps
-            source_profile = default
-            region = ap-southeast-2
-            output = json
             """
             self.config.write(conf_ini)
             self.config.seek(0)
@@ -348,7 +382,7 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=7).invoke(...)
+        verify(cli, times=4).invoke(...)
 
     def test_source_profile_not_sso(self):
         with ArgvContext(program, '-d'):
