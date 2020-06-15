@@ -5,6 +5,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from configparser import ConfigParser, NoSectionError
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,29 +17,29 @@ AWS_CREDENTIAL_PATH = f"{Path.home()}/.aws/credentials"
 AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
 AWS_DEFAULT_REGION = "us-east-1"
 
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
+TRACE = 5
+logging.addLevelName(TRACE, 'TRACE')
 logger = logging.getLogger(__name__)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+
+aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
+profiles = None
 
 
 def get_aws_cli_v2_sso_cached_login(profile):
     file_paths = list_directory(AWS_SSO_CACHE_PATH)
     for file_path in file_paths:
         if not file_path.endswith('.json'):
-            logger.debug(f"Not JSON file, skip: {file_path}")
+            logger.log(TRACE, f"Not JSON file, skip: {file_path}")
             continue
 
         data = load_json(file_path)
         if data.get("startUrl") != profile["sso_start_url"]:
-            logger.debug(f"Not equal SSO start url, skip: {file_path}")
+            logger.log(TRACE, f"Not equal SSO start url, skip: {file_path}")
             continue
         if data.get("region") != profile["sso_region"]:
-            logger.debug(f"Not equal SSO region, skip: {file_path}")
+            logger.log(TRACE, f"Not equal SSO region, skip: {file_path}")
             continue
-        logger.debug(f"Using cached SSO login: {file_path}")
+        logger.log(TRACE, f"Using cached SSO login: {file_path}")
         return data
 
 
@@ -58,10 +59,15 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     write_config(AWS_CREDENTIAL_PATH, config)
 
 
-def print_export_vars(credentials):
-    print(f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}")
-    print(f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}")
-    print(f"export AWS_SESSION_TOKEN={credentials['sessionToken']}")
+def print_export_vars(profile_name, credentials):
+    if credentials:
+        logger.debug(f"Printing export statements for profile `{profile_name}`:")
+        logger.info(f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}")
+        logger.info(f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}")
+        logger.info(f"export AWS_SESSION_TOKEN={credentials['sessionToken']}")
+    else:
+        logger.debug(f"No credentials found to export for profile `{profile_name}`")
+
 
 def halt(error):
     logger.error(error)
@@ -78,6 +84,33 @@ def invoke(cmd):
     return success, output.strip('\n')
 
 
+def poll(cmd):
+    proc = subprocess.Popen(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    success = True
+
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        line = line.rstrip('\n')
+        if line != "":
+            logger.info(line)
+
+    for line in proc.stderr.readlines():
+        line = line.rstrip('\n')
+        if line != "":
+            logger.error(line)
+            success = False
+
+    return success
+
+
 def list_directory(path):
     file_paths = []
     if os.path.exists(path):
@@ -92,7 +125,7 @@ def load_json(path):
         with open(path) as context:
             return json.load(context)
     except ValueError:
-        logger.debug(f"Exception occur when loading JSON: {path}. Skip.")
+        logger.log(TRACE, f"Exception occur when loading JSON: {path}. Skip.")
         pass  # ignore invalid json
 
 
@@ -119,12 +152,18 @@ def parse_assume_role_credentials_expiry(dt_str):
     return expires_utc
 
 
+def parse_credentials_file_session_expiry(dt_str):
+    datetime_format_in_cred_file_aws_session_expiration = "%Y-%m-%dT%H:%M:%S+0000"  # 2020-06-14T17:13:26+0000
+    expires_utc = datetime.strptime(dt_str, datetime_format_in_cred_file_aws_session_expiration)
+    return expires_utc
+
+
 def parse_role_name_from_role_arn(role_arn):
     arr = role_arn.split('/')
-    return arr[len(arr)-1]
+    return arr[len(arr) - 1]
 
 
-def check_sso_cached_login_expires(profile_name, profile, aws_bin):
+def check_sso_cached_login_expires(profile_name, profile):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
     try:
         assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {AWS_SSO_CACHE_PATH}."
@@ -149,8 +188,8 @@ def check_sso_cached_login_expires(profile_name, profile, aws_bin):
     return cached_login
 
 
-def fetch_credentials(profile_name, profile, aws_bin):
-    cached_login = check_sso_cached_login_expires(profile_name, profile, aws_bin)
+def fetch_credentials(profile_name, profile):
+    cached_login = check_sso_cached_login_expires(profile_name, profile)
 
     cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
                         f"--output json " \
@@ -163,14 +202,14 @@ def fetch_credentials(profile_name, profile, aws_bin):
     role_cred_success, role_cred_output = invoke(cmd_get_role_cred)
 
     if not role_cred_success:
-        logger.debug(f"Command was: {cmd_get_role_cred}")
-        logger.debug(f"Output  was: {role_cred_output}")
+        logger.log(TRACE, f"Command was: {cmd_get_role_cred}")
+        logger.log(TRACE, f"Output  was: {role_cred_output}")
         halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Exception: {role_cred_output}")
 
     return json.loads(role_cred_output)['roleCredentials']
 
 
-def fetch_credentials_with_assume_role(profile_name, profile, aws_bin):
+def fetch_credentials_with_assume_role(profile_name, profile):
     role_name = parse_role_name_from_role_arn(profile['role_arn'])
 
     cmd_get_role = f"{aws_bin} iam get-role " \
@@ -182,8 +221,8 @@ def fetch_credentials_with_assume_role(profile_name, profile, aws_bin):
     get_role_success, get_role_output = invoke(cmd_get_role)
 
     if not get_role_success:
-        logger.debug(f"Command was: {cmd_get_role}")
-        logger.debug(f"Output  was: {get_role_output}")
+        logger.log(TRACE, f"Command was: {cmd_get_role}")
+        logger.log(TRACE, f"Output  was: {get_role_output}")
         halt(f"Error executing command: `{aws_bin} iam get-role`. Exception: {get_role_output}")
 
     duration_seconds = json.loads(get_role_output)['Role']['MaxSessionDuration']
@@ -200,8 +239,8 @@ def fetch_credentials_with_assume_role(profile_name, profile, aws_bin):
     role_cred_success, role_cred_output = invoke(cmd_assume_role_cred)
 
     if not role_cred_success:
-        logger.debug(f"Command was: {cmd_assume_role_cred}")
-        logger.debug(f"Output  was: {role_cred_output}")
+        logger.log(TRACE, f"Command was: {cmd_assume_role_cred}")
+        logger.log(TRACE, f"Output  was: {role_cred_output}")
         halt(f"Error executing command: `{aws_bin} sts assume-role`. Exception: {role_cred_output}")
 
     assume_role_cred = json.loads(role_cred_output)['Credentials']
@@ -216,6 +255,19 @@ def fetch_credentials_with_assume_role(profile_name, profile, aws_bin):
     _cred.update(expiration=_expire_utc_ts_millisecond)
 
     return _cred
+
+
+def eager_sync_source_profile(source_profile_name, source_profile):
+    if source_profile_name in profiles:  # it will come in main loop, so no proactive sync required
+        return
+    config = read_config(AWS_CREDENTIAL_PATH)
+    if config.has_section(source_profile_name):
+        cred_profile = dict(config.items(source_profile_name))
+        session_expires_utc = parse_credentials_file_session_expiry(cred_profile['aws_session_expiration'])
+        if datetime.utcnow() > session_expires_utc:
+            logger.log(TRACE, f"Eagerly sync source_profile `{source_profile_name}`")
+            credentials = fetch_credentials(source_profile_name, source_profile)
+            update_aws_cli_v1_credentials(source_profile_name, source_profile, credentials)
 
 
 def load_profile_from_config(profile_name, config):
@@ -237,13 +289,13 @@ def is_source_profile(profile):
     return {"source_profile", "role_arn", "region"} <= profile.keys()
 
 
-def update_profile(profile_name, config, aws_bin, exportvars):
+def update_profile(profile_name, config):
     profile = load_profile_from_config(profile_name, config)
 
-    logger.debug(f"Syncing profile... {profile_name}: {profile}")
+    logger.log(TRACE, f"Syncing profile... {profile_name}: {profile}")
 
     if is_sso_profile(profile):
-        credentials = fetch_credentials(profile_name, profile, aws_bin)
+        credentials = fetch_credentials(profile_name, profile)
 
     elif is_source_profile(profile):
         source_profile_name = profile['source_profile']
@@ -254,48 +306,78 @@ def update_profile(profile_name, config, aws_bin, exportvars):
         if profile['region'] != source_profile['sso_region']:
             logger.warning(f"Region mismatch with source_profile AWS SSO region. Skip syncing profile `{profile_name}`")
             return
-        check_sso_cached_login_expires(source_profile_name, source_profile, aws_bin)
-        logger.debug(f"Fetching credentials using assume role for `{profile_name}`")
-        credentials = fetch_credentials_with_assume_role(profile_name, profile, aws_bin)
+        check_sso_cached_login_expires(source_profile_name, source_profile)
+        eager_sync_source_profile(source_profile_name, source_profile)
+        logger.log(TRACE, f"Fetching credentials using assume role for `{profile_name}`")
+        credentials = fetch_credentials_with_assume_role(profile_name, profile)
 
     else:
         logger.warning(f"Not an AWS SSO profile nor no source_profile found. Skip syncing profile `{profile_name}`")
         return
 
-    logger.info(f"Printing export statements for profile {profile}:\n")
-    if exportvars:
-        print_export_vars(credentials)
-
     update_aws_cli_v1_credentials(profile_name, profile, credentials)
 
-    logger.info(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
+    logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
+
+    return credentials
 
 
 def main():
-    logger.info(f"{yawsso.__name__} {yawsso.__version__}")
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(message)s')  # print UNIX friendly format for PIPE use case
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+    version_help = f"{yawsso.__name__} {yawsso.__version__}"
     description = "Sync all named profiles when calling without any arguments"
     parser = argparse.ArgumentParser(prog=yawsso.__name__, description=description)
     parser.add_argument("--default", action="store_true", help=f"Sync AWS default profile and all named profiles")
     parser.add_argument("--default-only", action="store_true", help=f"Sync AWS default profile only and exit")
-    parser.add_argument("-p", "--profiles", nargs='*', metavar='', help=f"Sync specified AWS named profiles")
-    parser.add_argument("-b", "--bin", metavar='', help="AWS CLI v2 binary location (default to `aws` in PATH)")
+    parser.add_argument("-p", "--profiles", nargs="*", metavar="", help=f"Sync specified AWS named profiles")
+    parser.add_argument("-b", "--bin", metavar="", help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
-    parser.add_argument("-e", "--exportvars", help="Print out copy-pasteable export AWS env vars", action="store_true")
+    parser.add_argument("-t", "--trace", help="Trace output", action="store_true")
+    parser.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
+    parser.add_argument("-v", "--version", help="Print version and exit", action="store_true")
+
+    sp = parser.add_subparsers(title="available commands", metavar="", dest="command")
+    login_help = "Invoke aws sso login command and sync all named profiles"
+    login_description = f"{login_help}\nUse `default` profile if optional argument `--profile` absent"
+    login_command = sp.add_parser(
+        "login", description=login_description, help=login_help, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    login_command.add_argument("--profile", help="Login profile name (default to profile `default`)", metavar="")
+    login_command.add_argument(
+        "--this", action="store_true", help="Only sync this login profile (contrast to sync all named profiles)"
+    )
+    sp.add_parser("version", help="Print version and exit")
+
     args = parser.parse_args()
 
+    if args.trace:
+        formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+        handler.setFormatter(formatter)
+        logger.setLevel(TRACE)
+        logger.log(TRACE, "Logging level: TRACE")
+
     if args.debug:
+        formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+        handler.setFormatter(formatter)
         logger.setLevel(logging.DEBUG)
-        logger.debug(f"Logging level: DEBUG")
-        logger.debug(f"args: {args}")
-        logger.debug(f"AWS_CONFIG_PATH: {AWS_CONFIG_PATH}")
-        logger.debug(f"AWS_CREDENTIAL_PATH: {AWS_CREDENTIAL_PATH}")
-        logger.debug(f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
-        logger.debug(f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
-        if args.exportvars:
-            logger.debug("AWS variables will be printed as export statements")
+        logger.debug("Logging level: DEBUG")
 
-    aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
+    logger.log(TRACE, f"args: {args}")
+    logger.log(TRACE, f"AWS_CONFIG_PATH: {AWS_CONFIG_PATH}")
+    logger.log(TRACE, f"AWS_CREDENTIAL_PATH: {AWS_CREDENTIAL_PATH}")
+    logger.log(TRACE, f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
+    logger.log(TRACE, f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
 
+    if args.version:
+        logger.info(version_help)
+        exit(0)
+
+    global aws_bin
     if args.bin:
         aws_bin = args.bin
 
@@ -308,36 +390,74 @@ def main():
         halt(e)
 
     cmd_aws_cli_version = f"{aws_bin} --version"
-    cli_success, cli_version_output = invoke(cmd_aws_cli_version)
+    aws_cli_success, aws_cli_version_output = invoke(cmd_aws_cli_version)
 
-    if not cli_success:
-        halt(f"Error executing command: `{aws_bin} --version`. Exception: {cli_version_output}")
+    if not aws_cli_success:
+        halt(f"Error executing command: `{aws_bin} --version`. Exception: {aws_cli_version_output}")
 
-    if "aws-cli/2" not in cli_version_output:
-        halt(f"Required AWS CLI v2. Found {cli_version_output}")
+    if "aws-cli/2" not in aws_cli_version_output:
+        halt(f"Required AWS CLI v2. Found {aws_cli_version_output}")
 
-    logger.info(cli_version_output)
+    logger.debug(aws_cli_version_output)
 
     config = read_config(AWS_CONFIG_PATH)
 
-    if args.default or args.default_only:  # Specific flag to take care of default profile
-        update_profile("default", config, aws_bin, args.exportvars)
+    if args.command:
+        if args.command == "login":
+            login_profile = "default"
+            cmd_aws_sso_login = f"{aws_bin} sso login"
+
+            if args.profile:
+                login_profile = args.profile
+                cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={args.profile}"
+
+            logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
+
+            login_success = poll(cmd_aws_sso_login)
+            if not login_success:
+                halt(f"Error running command: `{cmd_aws_sso_login}`")
+
+            if args.this:
+                update_profile(login_profile, config)
+                exit(0)
+
+            if login_profile == "default":
+                update_profile("default", config)
+
+        elif args.command == "version":
+            logger.info(version_help)
+            exit(0)
+
+    # Specific use case: making `yawsso -e` behaviour to sync default profile, print cred then exit
+    if args.export_vars and not args.default and not args.profiles:
+        credentials = update_profile("default", config)
+        print_export_vars("default", credentials)
+        exit(0)
+
+    # Specific use case: two flags to take care of default profile sync behaviour
+    if args.default or args.default_only:
+        credentials = update_profile("default", config)
+        if args.export_vars:
+            print_export_vars("default", credentials)
         if args.default_only:
             exit(0)
 
     named_profiles = list(map(lambda p: p.replace("profile ", ""), filter(lambda s: s != "default", config.sections())))
     if len(named_profiles) > 0:
-        logger.info(f"Current named profiles in config: {str(named_profiles)}")
+        logger.debug(f"Current named profiles in config: {str(named_profiles)}")
 
-    profiles = named_profiles  # When no args pass, update all named profiles in ~/.aws/config file
+    global profiles
+    profiles = named_profiles
 
-    if args.profiles:  # Check if the profiles listed are in ~/.aws/config file
+    if args.profiles:
         profiles = []
         for np in args.profiles:
-            if np in named_profiles:
-                profiles.append(np)
-            else:
-                halt(f"Named profile `{np}` is not specified in {AWS_CONFIG_PATH} file.")
+            if np not in named_profiles:
+                logger.warning(f"Named profile `{np}` is not specified in {AWS_CONFIG_PATH} file. Skipping...")
+                continue
+            profiles.append(np)
 
     for profile_name in profiles:
-        update_profile(profile_name, config, aws_bin, args.exportvars)
+        credentials = update_profile(profile_name, config)
+        if args.export_vars:
+            print_export_vars(profile_name, credentials)

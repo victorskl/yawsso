@@ -18,3 +18,6 @@ py38/
 
 *.iml
 .idea/
+.terraform/
+*.tfstate
+.DS_Store

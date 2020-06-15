@@ -1,6 +1,9 @@
 test:
 	@py.test
 
+tf:
+	@AWS_PROFILE=dev terraform refresh
+
 .PHONY: doc
 doc:
 	@py.test --cov-report html:local/coverage --cov=yawsso tests/
