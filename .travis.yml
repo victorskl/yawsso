@@ -1,0 +1,18 @@
+language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+install:
+  # Install awscli v2 if not available
+  #- if ! [ -x "$(command -v aws)" ]; then curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" ; unzip awscliv2.zip ; sudo ./aws/install ; fi
+  # v1 should be fine for testing purpose
+  - pip install awscli
+  - pip install tox
+  - pip install '.[test]' .
+script:
+  - which aws
+#  - pytest
+  - tox
+after_success:
+  - coveralls

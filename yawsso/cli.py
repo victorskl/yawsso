@@ -8,6 +8,7 @@ import subprocess
 import sys
 from configparser import ConfigParser, NoSectionError
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 
 import yawsso
@@ -23,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
 profiles = None
+
+
+class Constant(Enum):
+    ROLE_CHAINING_DURATION_SECONDS = 3600
 
 
 def get_aws_cli_v2_sso_cached_login(profile):
@@ -84,7 +89,7 @@ def invoke(cmd):
     return success, output.strip('\n')
 
 
-def poll(cmd):
+def poll(cmd, output=True):
     proc = subprocess.Popen(
         shlex.split(cmd),
         stdout=subprocess.PIPE,
@@ -98,9 +103,9 @@ def poll(cmd):
         line = proc.stdout.readline()
         if not line:
             break
-        line = line.rstrip('\n')
-        if line != "":
-            logger.info(line)
+        line = line.rstrip('\n')    # pragma: no cover
+        if line != "" and output:   # pragma: no cover
+            logger.info(line)       # pragma: no cover
 
     for line in proc.stderr.readlines():
         line = line.rstrip('\n')
@@ -209,7 +214,7 @@ def fetch_credentials(profile_name, profile):
     return json.loads(role_cred_output)['roleCredentials']
 
 
-def fetch_credentials_with_assume_role(profile_name, profile):
+def get_role_max_session_duration(profile_name, profile):
     role_name = parse_role_name_from_role_arn(profile['role_arn'])
 
     cmd_get_role = f"{aws_bin} iam get-role " \
@@ -225,7 +230,17 @@ def fetch_credentials_with_assume_role(profile_name, profile):
         logger.log(TRACE, f"Output  was: {get_role_output}")
         halt(f"Error executing command: `{aws_bin} iam get-role`. Exception: {get_role_output}")
 
-    duration_seconds = json.loads(get_role_output)['Role']['MaxSessionDuration']
+    return json.loads(get_role_output)['Role']['MaxSessionDuration']
+
+
+def fetch_credentials_with_assume_role(profile_name, profile):
+    duration_seconds = get_role_max_session_duration(profile_name, profile)
+    if duration_seconds > Constant.ROLE_CHAINING_DURATION_SECONDS.value:
+        logger.log(TRACE, f"Role {profile['role_arn']} is configured with max duration `{duration_seconds}` seconds. "
+                          f"But AWS SSO service-linked role to assume another role_arn defined in source_profile form "
+                          f"`role chaining` (i.e. using a role to assume a second role). Fall back session duration "
+                          f"to a maximum of one hour. Well, you can always `yawsso` again when session expired!")
+        duration_seconds = Constant.ROLE_CHAINING_DURATION_SECONDS.value
 
     utc_now_ts = int(datetime.utcnow().replace(tzinfo=timezone.utc).timestamp())
     cmd_assume_role_cred = f"{aws_bin} sts assume-role " \
@@ -338,19 +353,18 @@ def main():
     parser.add_argument("-b", "--bin", metavar="", help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
     parser.add_argument("-t", "--trace", help="Trace output", action="store_true")
-    parser.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
+    parser.add_argument("-e", "--export-vars", dest="export_vars1", help="Print out AWS ENV vars", action="store_true")
     parser.add_argument("-v", "--version", help="Print version and exit", action="store_true")
 
     sp = parser.add_subparsers(title="available commands", metavar="", dest="command")
-    login_help = "Invoke aws sso login command and sync all named profiles"
+    login_help = "Invoke aws sso login and sync all named profiles"
     login_description = f"{login_help}\nUse `default` profile if optional argument `--profile` absent"
     login_command = sp.add_parser(
         "login", description=login_description, help=login_help, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    login_command.add_argument("--profile", help="Login profile name (default to profile `default`)", metavar="")
-    login_command.add_argument(
-        "--this", action="store_true", help="Only sync this login profile (contrast to sync all named profiles)"
-    )
+    login_command.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
+    login_command.add_argument("--profile", help="Login profile name (use `default` if absent)", metavar="")
+    login_command.add_argument("--this", action="store_true", help="Only sync this login profile")
     sp.add_parser("version", help="Print version and exit")
 
     args = parser.parse_args()
@@ -372,6 +386,11 @@ def main():
     logger.log(TRACE, f"AWS_CREDENTIAL_PATH: {AWS_CREDENTIAL_PATH}")
     logger.log(TRACE, f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
     logger.log(TRACE, f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
+
+    # Make export_vars avail either side of subcommand
+    x_vars = args.export_vars if hasattr(args, 'export_vars') and args.export_vars else False
+    x_vars1 = args.export_vars1 if hasattr(args, 'export_vars1') and args.export_vars1 else False
+    export_vars = x_vars or x_vars1
 
     if args.version:
         logger.info(version_help)
@@ -409,11 +428,12 @@ def main():
 
             if args.profile:
                 login_profile = args.profile
-                cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={args.profile}"
+
+            cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
 
             logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
 
-            login_success = poll(cmd_aws_sso_login)
+            login_success = poll(cmd_aws_sso_login, output=not export_vars)
             if not login_success:
                 halt(f"Error running command: `{cmd_aws_sso_login}`")
 
@@ -421,15 +441,15 @@ def main():
                 update_profile(login_profile, config)
                 exit(0)
 
-            if login_profile == "default":
+            if login_profile == "default" and not export_vars:  # to reconcile `yawsso -e` behaviour use case below
                 update_profile("default", config)
 
         elif args.command == "version":
             logger.info(version_help)
             exit(0)
 
-    # Specific use case: making `yawsso -e` behaviour to sync default profile, print cred then exit
-    if args.export_vars and not args.default and not args.profiles:
+    # Specific use case: making `yawsso -e` or `yawsso login -e` behaviour to sync default profile, print cred then exit
+    if export_vars and not args.default and not args.profiles:
         credentials = update_profile("default", config)
         print_export_vars("default", credentials)
         exit(0)
@@ -437,7 +457,7 @@ def main():
     # Specific use case: two flags to take care of default profile sync behaviour
     if args.default or args.default_only:
         credentials = update_profile("default", config)
-        if args.export_vars:
+        if export_vars:
             print_export_vars("default", credentials)
         if args.default_only:
             exit(0)
@@ -459,5 +479,5 @@ def main():
 
     for profile_name in profiles:
         credentials = update_profile(profile_name, config)
-        if args.export_vars:
+        if export_vars:
             print_export_vars(profile_name, credentials)

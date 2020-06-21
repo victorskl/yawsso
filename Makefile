@@ -1,6 +1,12 @@
 test:
 	@py.test
 
+coverage:
+	@coverage run --source=yawsso -m pytest tests/
+
+tox:
+	@tox -vv
+
 tf:
 	@AWS_PROFILE=dev terraform refresh
 
