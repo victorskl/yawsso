@@ -6,6 +6,7 @@ coverage.xml
 local/
 build/
 dist/
+.tox/
 
 venv/
 .venv/

@@ -28,6 +28,7 @@ setup(
             "mockito",
             "cli-test-helpers",
             "nose2",
+            "coveralls",
         ],
         "dev": [
             "twine",

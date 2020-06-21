@@ -1,6 +1,6 @@
 # yawsso
 
-[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=master)](https://codecov.io/gh/victorskl/yawsso?branch=master)
+[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=master)](https://codecov.io/gh/victorskl/yawsso?branch=master) [![Build Status](https://travis-ci.org/victorskl/yawsso.svg?branch=master)](https://travis-ci.org/victorskl/yawsso) [![Coverage Status](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=master)](https://coveralls.io/github/victorskl/yawsso?branch=master)
 
 Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 credentials.
 
@@ -70,6 +70,7 @@ export AWS_SESSION_TOKEN=xxx
 ```commandline
 yawsso login -h
 yawsso login
+yawsso login -e
 yawsso login --this
 yawsso login --profile dev
 yawsso login --profile dev --this

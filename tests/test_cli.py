@@ -1,4 +1,5 @@
 import json
+import logging
 import tempfile
 import uuid
 from datetime import datetime, timedelta
@@ -9,7 +10,13 @@ from cli_test_helpers import ArgvContext
 from mockito import unstub, when, contains, verify, mock
 
 from yawsso import cli
-from . import logger
+
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 program = 'yawsso'
 
@@ -117,7 +124,7 @@ class CLIUnitTests(TestCase):
                         }
                     ]
                 },
-                "MaxSessionDuration": 3600,
+                "MaxSessionDuration": 43200,
                 "RoleLastUsed": {
                     "LastUsedDate": "2020-06-14T02:27:18+00:00",
                     "Region": "ap-southeast-2"
@@ -581,7 +588,7 @@ class CLIUnitTests(TestCase):
         self.assertEqual(x.exception.code, 1)
 
     def test_login_command(self):
-        when(cli).poll(contains('aws sso login')).thenReturn(True)
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev'):
             cli.main()
         cred = cli.read_config(self.credentials.name)
@@ -591,7 +598,7 @@ class CLIUnitTests(TestCase):
         verify(cli, times=1).poll(...)
 
     def test_login_command_default(self):
-        when(cli).poll(contains('aws sso login')).thenReturn(True)
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
         with ArgvContext(program, '-t', 'login'):
             cli.main()
         cred = cli.read_config(self.credentials.name)
@@ -601,7 +608,7 @@ class CLIUnitTests(TestCase):
         verify(cli, times=1).poll(...)
 
     def test_login_command_this(self):
-        when(cli).poll(contains('aws sso login')).thenReturn(True)
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev', '--this'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
@@ -612,7 +619,7 @@ class CLIUnitTests(TestCase):
         verify(cli, times=1).poll(...)
 
     def test_login_command_fail(self):
-        when(cli).poll(contains('aws sso login')).thenReturn(False)
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(False)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev', '--this'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 1)
@@ -620,6 +627,28 @@ class CLIUnitTests(TestCase):
         tok_now = cred['dev']['aws_session_token']
         self.assertEqual(tok_now, 'tok')  # assert no update
         verify(cli, times=1).invoke(...)
+
+    def test_login_command_export_vars(self):
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
+        with ArgvContext(program, '-t', 'login', '-e'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['default']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli, times=1).poll(...)
+
+    def test_login_command_export_vars_2(self):
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
+        with ArgvContext(program, '-t', '-e', 'login'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['default']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli, times=1).poll(...)
 
     def test_version_command(self):
         with ArgvContext(program, 'version'), self.assertRaises(SystemExit) as x:

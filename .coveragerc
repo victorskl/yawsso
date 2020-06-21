@@ -1,0 +1,6 @@
+[run]
+source = yawsso
+omit = */test/test*,*tests*
+
+[report]
+omit = */test/test*,*tests*
