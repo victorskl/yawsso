@@ -1,5 +1,11 @@
+install:
+	@pip install '.[dev,test]' .
+
 test:
 	@py.test
+
+unit:
+	@python -m unittest
 
 coverage:
 	@coverage run --source=yawsso -m pytest tests/

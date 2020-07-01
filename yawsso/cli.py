@@ -13,25 +13,29 @@ from pathlib import Path
 
 import yawsso
 
-AWS_CONFIG_PATH = f"{Path.home()}/.aws/config"
-AWS_CREDENTIAL_PATH = f"{Path.home()}/.aws/credentials"
-AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
-AWS_DEFAULT_REGION = "us-east-1"
-
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
 logger = logging.getLogger(__name__)
 
-aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
-profiles = None
-
 
 class Constant(Enum):
     ROLE_CHAINING_DURATION_SECONDS = 3600
+    AWS_SSO_CACHE_PATH = f"{Path.home()}/.aws/sso/cache"
+    AWS_CONFIG_FILE = f"{Path.home()}/.aws/config"
+    AWS_SHARED_CREDENTIALS_FILE = f"{Path.home()}/.aws/credentials"
+    AWS_DEFAULT_REGION = "us-east-1"
+
+
+aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
+profiles = None
+aws_sso_cache_path = os.getenv("AWS_SSO_CACHE_PATH", Constant.AWS_SSO_CACHE_PATH.value)
+aws_config_file = os.getenv("AWS_CONFIG_FILE", Constant.AWS_CONFIG_FILE.value)
+aws_shared_credentials_file = os.getenv("AWS_SHARED_CREDENTIALS_FILE", Constant.AWS_SHARED_CREDENTIALS_FILE.value)
+aws_default_region = os.getenv("AWS_DEFAULT_REGION", Constant.AWS_DEFAULT_REGION.value)
 
 
 def get_aws_cli_v2_sso_cached_login(profile):
-    file_paths = list_directory(AWS_SSO_CACHE_PATH)
+    file_paths = list_directory(aws_sso_cache_path)
     for file_path in file_paths:
         if not file_path.endswith('.json'):
             logger.log(TRACE, f"Not JSON file, skip: {file_path}")
@@ -49,8 +53,8 @@ def get_aws_cli_v2_sso_cached_login(profile):
 
 
 def update_aws_cli_v1_credentials(profile_name, profile, credentials):
-    region = profile.get("region", AWS_DEFAULT_REGION)
-    config = read_config(AWS_CREDENTIAL_PATH)
+    region = profile.get("region", aws_default_region)
+    config = read_config(aws_shared_credentials_file)
     if config.has_section(profile_name):
         config.remove_section(profile_name)
     config.add_section(profile_name)
@@ -61,7 +65,7 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     ts_expires_millisecond = credentials["expiration"]
     dt_utc = str(datetime.utcfromtimestamp(ts_expires_millisecond / 1000.0).isoformat() + '+0000')
     config.set(profile_name, "aws_session_expiration", dt_utc)
-    write_config(AWS_CREDENTIAL_PATH, config)
+    write_config(aws_shared_credentials_file, config)
 
 
 def print_export_vars(profile_name, credentials):
@@ -171,7 +175,7 @@ def parse_role_name_from_role_arn(role_arn):
 def check_sso_cached_login_expires(profile_name, profile):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
     try:
-        assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {AWS_SSO_CACHE_PATH}."
+        assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {aws_sso_cache_path}."
     except AssertionError as e:
         halt(e)
 
@@ -275,7 +279,7 @@ def fetch_credentials_with_assume_role(profile_name, profile):
 def eager_sync_source_profile(source_profile_name, source_profile):
     if source_profile_name in profiles:  # it will come in main loop, so no proactive sync required
         return
-    config = read_config(AWS_CREDENTIAL_PATH)
+    config = read_config(aws_shared_credentials_file)
     if config.has_section(source_profile_name):
         cred_profile = dict(config.items(source_profile_name))
         session_expires_utc = parse_credentials_file_session_expiry(cred_profile['aws_session_expiration'])
@@ -382,10 +386,10 @@ def main():
         logger.debug("Logging level: DEBUG")
 
     logger.log(TRACE, f"args: {args}")
-    logger.log(TRACE, f"AWS_CONFIG_PATH: {AWS_CONFIG_PATH}")
-    logger.log(TRACE, f"AWS_CREDENTIAL_PATH: {AWS_CREDENTIAL_PATH}")
-    logger.log(TRACE, f"AWS_SSO_CACHE_PATH: {AWS_SSO_CACHE_PATH}")
-    logger.log(TRACE, f"Cache SSO JSON files: {list_directory(AWS_SSO_CACHE_PATH)}")
+    logger.log(TRACE, f"AWS_CONFIG_FILE: {aws_config_file}")
+    logger.log(TRACE, f"AWS_SHARED_CREDENTIALS_FILE: {aws_shared_credentials_file}")
+    logger.log(TRACE, f"AWS_SSO_CACHE_PATH: {aws_sso_cache_path}")
+    logger.log(TRACE, f"Cache SSO JSON files: {list_directory(aws_sso_cache_path)}")
 
     # Make export_vars avail either side of subcommand
     x_vars = args.export_vars if hasattr(args, 'export_vars') and args.export_vars else False
@@ -402,9 +406,9 @@ def main():
 
     try:
         assert shutil.which(aws_bin) is not None, f"Can not find AWS CLI v2 `{aws_bin}` command."
-        assert os.path.exists(AWS_CONFIG_PATH), f"{AWS_CONFIG_PATH} does not exists"
-        assert os.path.exists(AWS_CREDENTIAL_PATH), f"{AWS_CREDENTIAL_PATH} does not exists"
-        assert os.path.exists(AWS_SSO_CACHE_PATH), f"{AWS_SSO_CACHE_PATH} does not exists"
+        assert os.path.exists(aws_config_file), f"{aws_config_file} does not exists"
+        assert os.path.exists(aws_shared_credentials_file), f"{aws_shared_credentials_file} does not exists"
+        assert os.path.exists(aws_sso_cache_path), f"{aws_sso_cache_path} does not exists"
     except AssertionError as e:
         halt(e)
 
@@ -419,7 +423,7 @@ def main():
 
     logger.debug(aws_cli_version_output)
 
-    config = read_config(AWS_CONFIG_PATH)
+    config = read_config(aws_config_file)
 
     if args.command:
         if args.command == "login":
@@ -473,7 +477,7 @@ def main():
         profiles = []
         for np in args.profiles:
             if np not in named_profiles:
-                logger.warning(f"Named profile `{np}` is not specified in {AWS_CONFIG_PATH} file. Skipping...")
+                logger.warning(f"Named profile `{np}` is not specified in {aws_config_file} file. Skipping...")
                 continue
             profiles.append(np)
 
