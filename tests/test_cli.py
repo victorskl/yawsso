@@ -41,6 +41,35 @@ class CLIUnitTests(TestCase):
         sso_role_name = AdministratorAccess
         region = ap-southeast-2
         output = json
+
+        [profile zzz]
+        region = ap-southeast-2
+        output = json
+        cli_pager = 
+
+        [profile lab]
+        sso_start_url = https://petshop.awsapps.com/start
+        sso_region = ap-southeast-2
+        sso_account_id = 923456781
+        sso_role_name = AdministratorAccess
+        region = ap-southeast-2
+        output = json
+
+        [profile lab1]
+        sso_start_url = https://petshop.awsapps.com/start
+        sso_region = ap-southeast-2
+        sso_account_id = 9874567321
+        sso_role_name = AdministratorAccess
+        region = ap-southeast-2
+        output = json
+
+        [profile lab2]
+        sso_start_url = https://petshop.awsapps.com/start
+        sso_region = ap-southeast-2
+        sso_account_id = 983456721
+        sso_role_name = AdministratorAccess
+        region = ap-southeast-2
+        output = json
         """
         self.config.write(conf_ini)
         self.config.seek(0)
@@ -156,6 +185,16 @@ class CLIUnitTests(TestCase):
             self.assertNotEqual(new_tok, 'tok')
             self.assertEqual(new_tok, 'VeryLongBase664String==')
             verify(cli, times=3).invoke(...)
+
+    def test_profile_prefix(self):
+        with ArgvContext(program, '-p', 'lab*', 'lab', 'zzz', '--trace'):
+            cli.main()
+            cred = cli.read_config(self.credentials.name)
+            new_tok = cred['lab']['aws_session_token']
+            self.assertNotEqual(new_tok, 'tok')
+            self.assertEqual(new_tok, 'VeryLongBase664String==')
+            self.assertEqual(4, len(cli.profiles))
+            verify(cli, times=7).invoke(...)
 
     def test_not_sso_profile(self):
         with ArgvContext(program, '-p', 'dev', '-t'):

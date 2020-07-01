@@ -476,10 +476,19 @@ def main():
     if args.profiles:
         profiles = []
         for np in args.profiles:
-            if np not in named_profiles:
-                logger.warning(f"Named profile `{np}` is not specified in {aws_config_file} file. Skipping...")
-                continue
-            profiles.append(np)
+            if np.endswith("*"):
+                prefix = np.split("*")[0]
+                logger.log(TRACE, f"Collecting all named profiles start with '{prefix}'")
+                for _p in named_profiles:
+                    if _p.startswith(prefix):
+                        profiles.append(_p)
+            else:
+                if np not in named_profiles:
+                    logger.warning(f"Named profile `{np}` is not specified in {aws_config_file} file. Skipping...")
+                    continue
+                profiles.append(np)
+        profiles = list(set(profiles))  # dedup
+        logger.debug(f"Syncing named profiles: {profiles}")
 
     for profile_name in profiles:
         credentials = update_profile(profile_name, config)
