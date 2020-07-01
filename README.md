@@ -55,6 +55,20 @@ yawsso -p dev prod
 yawsso --default -p dev prod
 ```
 
+- To sync for all named profiles start with prefix pattern `lab*`, do:
+```
+(zsh)
+yawsso -p 'lab*'
+
+(bash)
+yawsso -p lab*
+```
+
+- To sync for all named profiles start with prefix pattern `lab*` as well as `dev` and `prod`, do:
+```
+yawsso -p 'lab*' dev prod
+```
+
 - Use `-e` flag if you want a temporary copy-paste-able time-gated access token for an instance or external machine. It use `default` profile if no additional arguments pass. The main use case is for those who use `default` profile, and would like to PIPE like this `aws sso login && yawsso -e | pbcopy`. Otherwise for named profile, do `yawsso -e -p dev`.
 
     > PLEASE USE THIS FEATURE WITH CARE SINCE **ENVIRONMENT VARIABLES USED ON SHARED SYSTEMS CAN GIVE UNAUTHORIZED ACCESS TO PRIVATE RESOURCES**:
