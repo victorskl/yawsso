@@ -78,9 +78,9 @@ class CLIUnitTests(TestCase):
         self.sso_cache_json.seek(0)
         self.sso_cache_json.read()
 
-        cli.AWS_CONFIG_PATH = self.config.name
-        cli.AWS_CREDENTIAL_PATH = self.credentials.name
-        cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+        cli.aws_config_file = self.config.name
+        cli.aws_shared_credentials_file = self.credentials.name
+        cli.aws_sso_cache_path = self.sso_cache_dir.name
 
         mock_output = {
             'roleCredentials':
@@ -171,7 +171,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         cred = cli.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
@@ -190,19 +190,19 @@ class CLIUnitTests(TestCase):
 
     def test_config_not_found(self):
         with ArgvContext(program, '-t'), self.assertRaises(SystemExit) as x:
-            cli.AWS_CONFIG_PATH = "mock.config"
+            cli.aws_config_file = "mock.config"
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
     def test_credential_not_found(self):
         with ArgvContext(program, '-t'), self.assertRaises(SystemExit) as x:
-            cli.AWS_CREDENTIAL_PATH = "mock.credentials"
+            cli.aws_shared_credentials_file = "mock.credentials"
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
     def test_sso_cache_not_found(self):
         with ArgvContext(program, '-t'), self.assertRaises(SystemExit) as x:
-            cli.AWS_SSO_CACHE_PATH = "mock.sso.cache.json"
+            cli.aws_sso_cache_path = "mock.sso.cache.json"
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -223,7 +223,7 @@ class CLIUnitTests(TestCase):
             self.sso_cache_json.write(json.dumps(cache_json).encode('utf-8'))
             self.sso_cache_json.seek(0)
             self.sso_cache_json.read()
-            cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+            cli.aws_sso_cache_path = self.sso_cache_dir.name
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -248,7 +248,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         self.assertEqual(x.exception.code, 0)
 
@@ -266,7 +266,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -280,7 +280,7 @@ class CLIUnitTests(TestCase):
             self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.txt')
             self.sso_cache_json.seek(0)
             self.sso_cache_json.read()
-            cli.AWS_SSO_CACHE_PATH = self.sso_cache_dir.name
+            cli.aws_sso_cache_path = self.sso_cache_dir.name
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -302,7 +302,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -324,7 +324,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
@@ -384,7 +384,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         cred = cli.read_config(self.credentials.name)
         new_tok = cred['dev']['aws_session_token']
@@ -416,7 +416,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         cred = cli.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
@@ -438,7 +438,7 @@ class CLIUnitTests(TestCase):
             self.credentials.write(cred_ini)
             self.credentials.seek(0)
             self.credentials.read()
-            cli.AWS_CREDENTIAL_PATH = self.credentials.name
+            cli.aws_shared_credentials_file = self.credentials.name
 
             self.config.close()
             # now start new test case
@@ -461,7 +461,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         cred = cli.read_config(self.credentials.name)
         new_tok = cred['dev']['aws_session_token']
@@ -493,7 +493,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         cred = cli.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
@@ -536,7 +536,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         verify(cli, times=3).invoke(...)
         self.assertEqual(x.exception.code, 0)
@@ -559,7 +559,7 @@ class CLIUnitTests(TestCase):
             self.config.write(conf_ini)
             self.config.seek(0)
             self.config.read()
-            cli.AWS_CONFIG_PATH = self.config.name
+            cli.aws_config_file = self.config.name
             cli.main()
         verify(cli, times=3).invoke(...)
 
