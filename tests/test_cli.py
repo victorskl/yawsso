@@ -1,5 +1,6 @@
 import json
 import logging
+import pathlib
 import tempfile
 import uuid
 from datetime import datetime, timedelta
@@ -234,7 +235,19 @@ class CLIUnitTests(TestCase):
         self.assertEqual(x.exception.code, 1)
 
     def test_credential_not_found(self):
-        with ArgvContext(program, '-t'), self.assertRaises(SystemExit) as x:
+        tmp_file = tempfile.NamedTemporaryFile()
+        tmp_name = tmp_file.name
+        tmp_file.close()
+        with ArgvContext(program, '-d', '-p', 'dev'):
+            cli.aws_shared_credentials_file = tmp_name
+            cli.main()
+        cred = cli.read_config(cli.aws_shared_credentials_file)
+        tok_now = cred['dev']['aws_session_token']
+        self.assertEqual(tok_now, 'VeryLongBase664String==')
+
+    def test_credential_not_found_2(self):
+        when(pathlib.Path).mkdir(...).thenRaise(Exception("mock.credentials.file.exception"))
+        with ArgvContext(program, '-d', '-p', 'dev'), self.assertRaises(SystemExit) as x:
             cli.aws_shared_credentials_file = "mock.credentials"
             cli.main()
         self.assertEqual(x.exception.code, 1)
@@ -600,6 +613,25 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.aws_config_file = self.config.name
             cli.main()
+        verify(cli, times=3).invoke(...)
+
+    def test_clipboard_export_vars(self):
+        with ArgvContext(program, '-d', '-e', '-p', 'dev'):
+            cli.main()
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli, times=3).invoke(...)
+
+    def test_clipboard_export_vars_2(self):
+        when(cli.importlib.util).find_spec("pyperclip").thenReturn(None)
+        with ArgvContext(program, '-t', '-e', '-p', 'dev'):
+            cli.main()
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
         verify(cli, times=3).invoke(...)
 
     def test_parse_credentials_file_session_expiry(self):

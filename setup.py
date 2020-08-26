@@ -36,5 +36,6 @@ setup(
             "setuptools",
             "wheel",
         ],
-    }
+    },
+    python_requires=">=3.6",
 )
