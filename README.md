@@ -1,7 +1,6 @@
 # yawsso
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/e02d74942ed143a381603cd60ba4f64b)](https://app.codacy.com/manual/victorskl/yawsso?utm_source=github.com&utm_medium=referral&utm_content=victorskl/yawsso&utm_campaign=Badge_Grade_Dashboard)
-[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=master)](https://codecov.io/gh/victorskl/yawsso?branch=master) [![Build Status](https://travis-ci.org/victorskl/yawsso.svg?branch=master)](https://travis-ci.org/victorskl/yawsso) [![Coverage Status](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=master)](https://coveralls.io/github/victorskl/yawsso?branch=master)
+[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![Build Status](https://travis-ci.org/victorskl/yawsso.svg?branch=master)](https://travis-ci.org/victorskl/yawsso) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=master)](https://codecov.io/gh/victorskl/yawsso?branch=master) [![Coverage Status](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=master)](https://coveralls.io/github/victorskl/yawsso?branch=master) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e02d74942ed143a381603cd60ba4f64b)](https://app.codacy.com/manual/victorskl/yawsso?utm_source=github.com&utm_medium=referral&utm_content=victorskl/yawsso&utm_campaign=Badge_Grade_Dashboard)
 
 Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 credentials.
 
@@ -11,6 +10,7 @@ Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 cred
 
 ## Prerequisite
 
+- Required `Python >= 3.6`
 - Required [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
 - Assume you have already setup [AWS SSO](https://aws.amazon.com/single-sign-on/) for your organization
 

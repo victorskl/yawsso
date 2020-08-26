@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import json
 import logging
 import os
@@ -69,21 +70,23 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
 
 
 def get_export_vars(profile_name, credentials):
-    try:
-        if credentials:
-            clipboard = f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}\n"
-            clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
-            clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
+    pyperclip_spec = importlib.util.find_spec("pyperclip")
+    pyperclip_found = pyperclip_spec is not None
+
+    if credentials:
+        clipboard = f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}\n"
+        clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
+        clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
+        if pyperclip_found:
             import pyperclip
             pyperclip.copy(clipboard)
-            logger.info(f"Credentials copied to your clipboard for profile \"{profile_name}\"!")
+            logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")
         else:
-            logger.debug(f"No credentials found to export for profile \"{profile_name}\"")
-    except ImportError:
-            logger.info(f"Clipboard module pyperclip not installed, showing creds on terminal instead:\n\n {clipboard}\n")
-    except pyperclip.PyperclipException:
-            logger.info("Could not find clipboard, perhaps running on a CI environment?")
-            pass
+            logger.debug("Clipboard module pyperclip not installed, showing credentials on terminal instead")
+            print(clipboard)  # print is intentional, i.e. not to clutter with logger
+    else:
+        logger.debug(f"No credentials found to export for profile '{profile_name}'")
+
 
 def halt(error):
     logger.error(error)
@@ -220,7 +223,8 @@ def fetch_credentials(profile_name, profile):
     if not role_cred_success:
         logger.log(TRACE, f"Command was: {cmd_get_role_cred}")
         logger.log(TRACE, f"Output  was: {role_cred_output}")
-        halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Exception: {role_cred_output}")
+        halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Possibly SSO login session has expired. "
+             f"Try login again. Exception: {role_cred_output}")
 
     return json.loads(role_cred_output)['roleCredentials']
 
@@ -411,11 +415,21 @@ def main():
     if args.bin:
         aws_bin = args.bin
 
+    if not os.path.exists(aws_shared_credentials_file):
+        logger.debug(f"{aws_shared_credentials_file} file does not exist. Attempting to create one.")
+        try:
+            Path(os.path.dirname(aws_shared_credentials_file)).mkdir(parents=True, exist_ok=True)
+            with open(aws_shared_credentials_file, "w"):
+                pass
+        except Exception as e:
+            logger.debug(f"Can not create {aws_shared_credentials_file}. Exception: {e}")
+            halt(f"{aws_shared_credentials_file} file does not exist. Please create one and try again.")
+
     try:
         assert shutil.which(aws_bin) is not None, f"Can not find AWS CLI v2 `{aws_bin}` command."
-        assert os.path.exists(aws_config_file), f"{aws_config_file} does not exists"
-        assert os.path.exists(aws_shared_credentials_file), f"{aws_shared_credentials_file} does not exists"
-        assert os.path.exists(aws_sso_cache_path), f"{aws_sso_cache_path} does not exists"
+        assert os.path.exists(aws_config_file), f"{aws_config_file} does not exist"
+        assert os.path.exists(aws_shared_credentials_file), f"{aws_shared_credentials_file} does not exist"
+        assert os.path.exists(aws_sso_cache_path), f"{aws_sso_cache_path} does not exist"
     except AssertionError as e:
         halt(e)
 
