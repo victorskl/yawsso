@@ -27,11 +27,18 @@ class Constant(Enum):
     AWS_DEFAULT_REGION = "us-east-1"
 
 
+def xu(path):
+    if str(path).startswith('~'):
+        return os.path.expanduser(path)
+    else:
+        return path
+
+
 aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
 profiles = None
-aws_sso_cache_path = os.getenv("AWS_SSO_CACHE_PATH", Constant.AWS_SSO_CACHE_PATH.value)
-aws_config_file = os.getenv("AWS_CONFIG_FILE", Constant.AWS_CONFIG_FILE.value)
-aws_shared_credentials_file = os.getenv("AWS_SHARED_CREDENTIALS_FILE", Constant.AWS_SHARED_CREDENTIALS_FILE.value)
+aws_sso_cache_path = xu(os.getenv("AWS_SSO_CACHE_PATH", Constant.AWS_SSO_CACHE_PATH.value))
+aws_config_file = xu(os.getenv("AWS_CONFIG_FILE", Constant.AWS_CONFIG_FILE.value))
+aws_shared_credentials_file = xu(os.getenv("AWS_SHARED_CREDENTIALS_FILE", Constant.AWS_SHARED_CREDENTIALS_FILE.value))
 aws_default_region = os.getenv("AWS_DEFAULT_REGION", Constant.AWS_DEFAULT_REGION.value)
 
 
