@@ -2,8 +2,8 @@ language: python
 addons:
   apt:
     packages:
-    - xclip
-    - xvfb
+      - xclip
+      - xvfb
 python:
   - "3.6"
   - "3.7"
@@ -17,6 +17,8 @@ install:
   - pip install '.[test]' .
 script:
   - which aws
+# https://github.com/travis-ci/travis-ci/issues/4387
+# https://stackoverflow.com/questions/57743427/accessing-clipboard-on-travis-ci
   - xvfb-run pytest
 #  - xvfb-run tox
 after_success:

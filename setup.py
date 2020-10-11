@@ -32,7 +32,7 @@ setup(
             "cli-test-helpers",
             "nose2",
             "coveralls",
-            "pyperclip",
+            "pyperclip==1.7.0",
         ],
         "dev": [
             "twine",
