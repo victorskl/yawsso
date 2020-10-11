@@ -21,6 +21,9 @@ setup(
         "console_scripts": ["yawsso=yawsso.cli:main"],
     },
     extras_require={
+        "all": [
+            "pyperclip",
+        ],
         "test": [
             "pytest",
             "pytest-cov",
@@ -29,7 +32,7 @@ setup(
             "cli-test-helpers",
             "nose2",
             "coveralls",
-            "pyperclip"
+            "pyperclip",
         ],
         "dev": [
             "twine",
