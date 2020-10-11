@@ -82,7 +82,7 @@ def get_export_vars(profile_name, credentials):
             pyperclip.copy(clipboard)
             logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")
         else:
-            logger.debug("Clipboard module pyperclip not installed, showing credentials on terminal instead")
+            logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
             print(clipboard)  # print is intentional, i.e. not to clutter with logger
     else:
         logger.debug(f"No credentials found to export for profile '{profile_name}'")
@@ -145,7 +145,6 @@ def load_json(path):
             return json.load(context)
     except ValueError:
         logger.log(TRACE, f"Exception occur when loading JSON: {path}. Skip.")
-        pass  # ignore invalid json
 
 
 def read_config(path):
@@ -288,7 +287,7 @@ def fetch_credentials_with_assume_role(profile_name, profile):
 
 
 def eager_sync_source_profile(source_profile_name, source_profile):
-    if source_profile_name in profiles:  # it will come in main loop, so no proactive sync required
+    if profiles and source_profile_name in profiles:  # it will come in main loop, so no proactive sync required
         return
     config = read_config(aws_shared_credentials_file)
     if config.has_section(source_profile_name):
@@ -447,7 +446,11 @@ def main():
     config = read_config(aws_config_file)
 
     if args.command:
-        if args.command == "login":
+        if args.command == "version":
+            logger.info(version_help)
+            exit(0)
+
+        elif args.command == "login":
             login_profile = "default"
             cmd_aws_sso_login = f"{aws_bin} sso login"
 
@@ -462,19 +465,24 @@ def main():
             if not login_success:
                 halt(f"Error running command: `{cmd_aws_sso_login}`")
 
+            # Specific use case: making `yawsso login -e` or `yawsso login --profile NAME -e`
+            # to login, sync, print cred then exit
+            if export_vars:
+                credentials = update_profile(login_profile, config)
+                get_export_vars(login_profile, credentials)
+                exit(0)
+
             if args.this:
                 update_profile(login_profile, config)
                 exit(0)
 
-            if login_profile == "default" and not export_vars:  # to reconcile `yawsso -e` behaviour use case below
+            if login_profile == "default" and not export_vars:
                 update_profile("default", config)
 
-        elif args.command == "version":
-            logger.info(version_help)
-            exit(0)
+            # otherwise continue with sync all named profiles below
 
-    # Specific use case: making `yawsso -e` or `yawsso login -e` behaviour to sync default profile, print cred then exit
-    if export_vars and not args.default and not args.profiles:
+    # Specific use case: making `yawsso -e` behaviour to sync default profile, print cred then exit
+    if export_vars and not args.default and not args.profiles and not hasattr(args, 'profile'):
         credentials = update_profile("default", config)
         get_export_vars("default", credentials)
         exit(0)
