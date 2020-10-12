@@ -768,3 +768,10 @@ class CLIUnitTests(TestCase):
         when(cli.subprocess).Popen(...).thenReturn(mock_proc)
         success = cli.poll(f"aws space get-moon")
         self.assertTrue(not success)
+
+    def test_xu(self):
+        a = cli.xu('~/tmp')
+        b = f"{pathlib.Path.home()}/tmp"
+        logger.info(f"A: {a}")
+        logger.info(f"B: {b}")
+        self.assertEqual(a, b)
