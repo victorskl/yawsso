@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import json
 import logging
 import os
@@ -10,6 +9,7 @@ import sys
 from configparser import ConfigParser, NoSectionError
 from datetime import datetime, timezone
 from enum import Enum
+from importlib import util as importlib_util
 from pathlib import Path
 
 import yawsso
@@ -61,6 +61,11 @@ def get_aws_cli_v2_sso_cached_login(profile):
 
 
 def update_aws_cli_v1_credentials(profile_name, profile, credentials):
+    if credentials is None:
+        logger.warning(f"No appropriate credentials found for profile '{profile_name}'. "
+                       f"Skip syncing it. Use --trace flag to see possible error causes.")
+        return
+
     region = profile.get("region", aws_default_region)
     config = read_config(aws_shared_credentials_file)
     if config.has_section(profile_name):
@@ -75,24 +80,29 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     config.set(profile_name, "aws_session_expiration", dt_utc)
     write_config(aws_shared_credentials_file, config)
 
+    logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
+
 
 def get_export_vars(profile_name, credentials):
-    pyperclip_spec = importlib.util.find_spec("pyperclip")
+    if credentials is None:
+        logger.warning(f"No appropriate credentials found for profile '{profile_name}'. "
+                       f"Skip exporting it. Use --trace flag to see possible error causes.")
+        return
+
+    pyperclip_spec = importlib_util.find_spec("pyperclip")
     pyperclip_found = pyperclip_spec is not None
 
-    if credentials:
-        clipboard = f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}\n"
-        clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
-        clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
-        if pyperclip_found:
-            import pyperclip
-            pyperclip.copy(clipboard)
-            logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")
-        else:
-            logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
-            print(clipboard)  # print is intentional, i.e. not to clutter with logger
+    clipboard = f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}\n"
+    clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
+    clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
+    if pyperclip_found:
+        import pyperclip
+
+        pyperclip.copy(clipboard)
+        logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")
     else:
-        logger.debug(f"No credentials found to export for profile '{profile_name}'")
+        logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
+        print(clipboard)  # print is intentional, i.e. not to clutter with logger
 
 
 def halt(error):
@@ -188,6 +198,15 @@ def parse_role_name_from_role_arn(role_arn):
     return arr[len(arr) - 1]
 
 
+def append_cli_global_options(cmd: str, profile: dict):
+    ca_bundle = profile.get('ca_bundle', None)
+    if ca_bundle:
+        cmd = f"{cmd} --ca-bundle {ca_bundle}"
+
+    logger.log(TRACE, f"COMMAND: {cmd}")
+    return cmd
+
+
 def check_sso_cached_login_expires(profile_name, profile):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
     try:
@@ -199,16 +218,6 @@ def check_sso_cached_login_expires(profile_name, profile):
 
     if datetime.utcnow() > expires_utc:
         halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
-
-    cmd_sts_get_caller_identity = f"{aws_bin} sts get-caller-identity " \
-                                  f"--output json " \
-                                  f"--region {profile['sso_region']} " \
-                                  f"--profile {profile_name}"
-
-    caller_success, caller_output = invoke(cmd_sts_get_caller_identity)
-
-    if not caller_success:
-        halt(f"Error executing command: `{aws_bin} sts get-caller-identity`. Exception: {caller_output}")
 
     return cached_login
 
@@ -224,13 +233,13 @@ def fetch_credentials(profile_name, profile):
                         f"--account-id {profile['sso_account_id']} " \
                         f"--access-token {cached_login['accessToken']}"
 
+    cmd_get_role_cred = append_cli_global_options(cmd_get_role_cred, profile)
+
     role_cred_success, role_cred_output = invoke(cmd_get_role_cred)
 
     if not role_cred_success:
-        logger.log(TRACE, f"Command was: {cmd_get_role_cred}")
-        logger.log(TRACE, f"Output  was: {role_cred_output}")
-        halt(f"Error executing command: `{aws_bin} sso get-role-credentials`. Possibly SSO login session has expired. "
-             f"Try login again. Exception: {role_cred_output}")
+        logger.log(TRACE, f"ERROR EXECUTING COMMAND: '{cmd_get_role_cred}'. EXCEPTION: '{role_cred_output}'")
+        return
 
     return json.loads(role_cred_output)['roleCredentials']
 
@@ -244,12 +253,15 @@ def get_role_max_session_duration(profile_name, profile):
                    f"--role-name {role_name} " \
                    f"--region {profile['region']}"
 
+    cmd_get_role = append_cli_global_options(cmd_get_role, profile)
+
     get_role_success, get_role_output = invoke(cmd_get_role)
 
     if not get_role_success:
-        logger.log(TRACE, f"Command was: {cmd_get_role}")
-        logger.log(TRACE, f"Output  was: {get_role_output}")
-        halt(f"Error executing command: `{aws_bin} iam get-role`. Exception: {get_role_output}")
+        logger.log(TRACE, f"ERROR EXECUTING COMMAND: '{cmd_get_role}'. EXCEPTION: {get_role_output}")
+        logger.debug(f"Can not determine role {role_name} maximum session duration. "
+                     f"Using default value {Constant.ROLE_CHAINING_DURATION_SECONDS.value} seconds.")
+        return Constant.ROLE_CHAINING_DURATION_SECONDS.value
 
     return json.loads(get_role_output)['Role']['MaxSessionDuration']
 
@@ -272,12 +284,13 @@ def fetch_credentials_with_assume_role(profile_name, profile):
                            f"--duration-seconds {duration_seconds} " \
                            f"--region {profile['region']}"
 
+    cmd_assume_role_cred = append_cli_global_options(cmd_assume_role_cred, profile)
+
     role_cred_success, role_cred_output = invoke(cmd_assume_role_cred)
 
     if not role_cred_success:
-        logger.log(TRACE, f"Command was: {cmd_assume_role_cred}")
-        logger.log(TRACE, f"Output  was: {role_cred_output}")
-        halt(f"Error executing command: `{aws_bin} sts assume-role`. Exception: {role_cred_output}")
+        logger.log(TRACE, f"ERROR EXECUTING COMMAND: `{cmd_assume_role_cred}`. EXCEPTION: {role_cred_output}")
+        return
 
     assume_role_cred = json.loads(role_cred_output)['Credentials']
 
@@ -352,8 +365,6 @@ def update_profile(profile_name, config):
         return
 
     update_aws_cli_v1_credentials(profile_name, profile, credentials)
-
-    logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
 
     return credentials
 
@@ -443,7 +454,7 @@ def main():
     aws_cli_success, aws_cli_version_output = invoke(cmd_aws_cli_version)
 
     if not aws_cli_success:
-        halt(f"Error executing command: `{aws_bin} --version`. Exception: {aws_cli_version_output}")
+        halt(f"ERROR EXECUTING COMMAND: '{cmd_aws_cli_version}'. EXCEPTION: {aws_cli_version_output}")
 
     if "aws-cli/2" not in aws_cli_version_output:
         halt(f"Required AWS CLI v2. Found {aws_cli_version_output}")

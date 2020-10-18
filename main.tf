@@ -1,9 +1,16 @@
 terraform {
-  required_version = "~> 0.12"
+  required_version = "~> 0.13"
+
+  required_providers {
+    aws = {
+      version = "~> 3.11.0"
+    }
+  }
 }
 
 provider "aws" {
-  version = "~> 2.66"
+  profile = "dev"
+  region  = "ap-southeast-2"
 }
 
 data "aws_vpc" "default_vpc" {
