@@ -13,8 +13,16 @@ coverage:
 tox:
 	@tox -vv
 
+nose:
+	@nose2 -vv
+
 tf:
 	@AWS_PROFILE=dev terraform refresh
+
+smoke:
+	@terraform plan
+	@cdk synth --app "python cdk.py" --profile dev
+	@cw ls -p dev groups
 
 .PHONY: doc
 doc:

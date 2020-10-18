@@ -71,6 +71,15 @@ class CLIUnitTests(TestCase):
         sso_role_name = AdministratorAccess
         region = ap-southeast-2
         output = json
+        
+        [profile ca_bundle]
+        sso_start_url = https://petshop.awsapps.com/start
+        sso_region = ap-southeast-2
+        sso_account_id = 123456789
+        sso_role_name = AdministratorAccess
+        region = ap-southeast-2
+        output = json
+        ca_bundle = dev/apps/ca-certs/cabundle-2019mar05.pem        
         """
         self.config.write(conf_ini)
         self.config.seek(0)
@@ -185,7 +194,7 @@ class CLIUnitTests(TestCase):
             new_tok = cred['dev']['aws_session_token']
             self.assertNotEqual(new_tok, 'tok')
             self.assertEqual(new_tok, 'VeryLongBase664String==')
-            verify(cli, times=3).invoke(...)
+            verify(cli, times=2).invoke(...)
 
     def test_profile_prefix(self):
         with ArgvContext(program, '-p', 'lab*', 'lab', 'zzz', '--trace'):
@@ -195,7 +204,7 @@ class CLIUnitTests(TestCase):
             self.assertNotEqual(new_tok, 'tok')
             self.assertEqual(new_tok, 'VeryLongBase664String==')
             self.assertEqual(4, len(cli.profiles))
-            verify(cli, times=7).invoke(...)
+            verify(cli, times=4).invoke(...)
 
     def test_not_sso_profile(self):
         with ArgvContext(program, '-p', 'dev', '-t'):
@@ -394,17 +403,10 @@ class CLIUnitTests(TestCase):
         logger.info(output)
         self.assertIsNone(output)
 
-    def test_sts_get_caller_identity_fail(self):
-        when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((False, 'does-not-matter'))
-        with self.assertRaises(SystemExit) as x:
-            cli.update_profile("dev", cli.read_config(self.config.name))
-        self.assertEqual(x.exception.code, 1)
-
     def test_sso_get_role_credentials_fail(self):
         when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((False, 'does-not-matter'))
-        with self.assertRaises(SystemExit) as x:
-            cli.update_profile("dev", cli.read_config(self.config.name))
-        self.assertEqual(x.exception.code, 1)
+        cred = cli.update_profile("dev", cli.read_config(self.config.name))
+        self.assertIsNone(cred)
 
     def test_aws_cli_version_fail(self):
         when(cli).invoke(contains('aws --version')).thenReturn((False, 'does-not-matter'))
@@ -442,7 +444,7 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=6).invoke(...)
+        verify(cli, times=4).invoke(...)
 
     def test_source_profile_region_mismatch(self):
         with ArgvContext(program, '-t', '-p', 'dev'):
@@ -519,7 +521,7 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=6).invoke(...)
+        verify(cli, times=4).invoke(...)
 
     def test_eager_sync_source_profile_should_skip(self):
         cli.profiles = ["default"]
@@ -559,7 +561,7 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=3).invoke(...)
+        verify(cli, times=2).invoke(...)
 
     def test_print_export_vars_fail(self):
         when(cli).update_profile(...).thenReturn(None)
@@ -590,7 +592,7 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.aws_config_file = self.config.name
             cli.main()
-        verify(cli, times=3).invoke(...)
+        verify(cli, times=2).invoke(...)
         self.assertEqual(x.exception.code, 0)
 
     def test_print_export_vars_default_profile(self):
@@ -613,7 +615,7 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.aws_config_file = self.config.name
             cli.main()
-        verify(cli, times=3).invoke(...)
+        verify(cli, times=2).invoke(...)
 
     def test_clipboard_export_vars(self):
         with ArgvContext(program, '-d', '-e', '-p', 'dev'):
@@ -622,17 +624,17 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=3).invoke(...)
+        verify(cli, times=2).invoke(...)
 
     def test_clipboard_export_vars_2(self):
-        when(cli.importlib.util).find_spec("pyperclip").thenReturn(None)
+        when(cli.importlib_util).find_spec("pyperclip").thenReturn(None)
         with ArgvContext(program, '-t', '-e', '-p', 'dev'):
             cli.main()
         cred = cli.read_config(self.credentials.name)
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli, times=3).invoke(...)
+        verify(cli, times=2).invoke(...)
 
     def test_parse_credentials_file_session_expiry(self):
         expires_utc = cli.parse_credentials_file_session_expiry("2020-06-14T17:13:26+0000")
@@ -643,20 +645,18 @@ class CLIUnitTests(TestCase):
             cli.main()
         self.assertEqual(x.exception.code, 0)
 
-    def test_fetch_credentials_with_assume_role_no_success_1(self):
+    def test_get_role_max_session_duration_no_success(self):
         when(cli).invoke(contains('aws iam get-role')).thenReturn((False, "does-not-matter"))
         p = {'role_arn': 'arn:aws:iam::1234567890:role/FullAdmin', 'region': 'us-east-1'}
-        with self.assertRaises(SystemExit) as x:
-            cli.fetch_credentials_with_assume_role("default", p)
-        self.assertEqual(x.exception.code, 1)
+        duration_seconds = cli.get_role_max_session_duration("default", p)
+        self.assertEqual(3600, duration_seconds)
 
-    def test_fetch_credentials_with_assume_role_no_success_2(self):
+    def test_fetch_credentials_with_assume_role_no_success(self):
         when(cli).invoke(contains('aws sts assume-role')).thenReturn((False, "does-not-matter"))
         when(cli).invoke(contains('aws iam get-role')).thenReturn((True, '{"Role": {"MaxSessionDuration": 3600}}'))
         p = {'role_arn': 'arn:aws:iam::1234567890:role/FullAdmin', 'region': 'us-east-1'}
-        with self.assertRaises(SystemExit) as x:
-            cli.fetch_credentials_with_assume_role("default", p)
-        self.assertEqual(x.exception.code, 1)
+        cred = cli.fetch_credentials_with_assume_role("default", p)
+        self.assertIsNone(cred)
 
     def test_login_command(self):
         when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
@@ -775,3 +775,18 @@ class CLIUnitTests(TestCase):
         logger.info(f"A: {a}")
         logger.info(f"B: {b}")
         self.assertEqual(a, b)
+
+    def test_ca_bundle(self):
+        with ArgvContext(program, '-p', 'ca_bundle', '-t'):
+            cli.main()
+            cred = cli.read_config(self.credentials.name)
+            new_tok = cred['ca_bundle']['aws_session_token']
+            self.assertNotEqual(new_tok, 'tok')
+            self.assertEqual(new_tok, 'VeryLongBase664String==')
+            verify(cli, times=2).invoke(...)
+
+    def test_append_cli_global_options(self):
+        ca_bundle_profile = cli.load_profile_from_config("ca_bundle", cli.read_config(self.config.name))
+        cmd = cli.append_cli_global_options("aws sso get-role-credentials", ca_bundle_profile)
+        logger.info(cmd)
+        self.assertIn('--ca-bundle', cmd)

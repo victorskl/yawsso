@@ -21,4 +21,9 @@ py38/
 .idea/
 .terraform/
 *.tfstate
+*.tfstate.backup
+
 .DS_Store
+
+cdk.out/
+cdk.context.json
