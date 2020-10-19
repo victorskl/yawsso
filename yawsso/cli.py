@@ -201,7 +201,7 @@ def parse_role_name_from_role_arn(role_arn):
 def append_cli_global_options(cmd: str, profile: dict):
     ca_bundle = profile.get('ca_bundle', None)
     if ca_bundle:
-        cmd = f"{cmd} --ca-bundle {ca_bundle}"
+        cmd = f"{cmd} --ca-bundle '{ca_bundle}'"
 
     logger.log(TRACE, f"COMMAND: {cmd}")
     return cmd
