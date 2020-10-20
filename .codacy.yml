@@ -3,3 +3,6 @@ exclude_paths:
   - '.github/**'
   - '.travis.yml'
   - 'README.md'
+  - 'cdk.py'
+  - 'main.tf'
+  - 'Makefile'
