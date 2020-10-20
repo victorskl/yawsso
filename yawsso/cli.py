@@ -209,10 +209,8 @@ def append_cli_global_options(cmd: str, profile: dict):
 
 def check_sso_cached_login_expires(profile_name, profile):
     cached_login = get_aws_cli_v2_sso_cached_login(profile)
-    try:
-        assert cached_login is not None, f"Can not find valid AWS CLI v2 SSO login cache in {aws_sso_cache_path}."
-    except AssertionError as e:
-        halt(e)
+    if cached_login is None:
+        halt(f"Can not find valid AWS CLI v2 SSO login cache in {aws_sso_cache_path} for profile {profile_name}.")
 
     expires_utc = parse_sso_cached_login_expiry(cached_login)
 
@@ -379,9 +377,9 @@ def main():
     version_help = f"{yawsso.__name__} {yawsso.__version__}"
     description = "Sync all named profiles when calling without any arguments"
     parser = argparse.ArgumentParser(prog=yawsso.__name__, description=description)
-    parser.add_argument("--default", action="store_true", help=f"Sync AWS default profile and all named profiles")
-    parser.add_argument("--default-only", action="store_true", help=f"Sync AWS default profile only and exit")
-    parser.add_argument("-p", "--profiles", nargs="*", metavar="", help=f"Sync specified AWS named profiles")
+    parser.add_argument("--default", action="store_true", help="Sync AWS default profile and all named profiles")
+    parser.add_argument("--default-only", action="store_true", help="Sync AWS default profile only and exit")
+    parser.add_argument("-p", "--profiles", nargs="*", metavar="", help="Sync specified AWS named profiles")
     parser.add_argument("-b", "--bin", metavar="", help="AWS CLI v2 binary location (default to `aws` in PATH)")
     parser.add_argument("-d", "--debug", help="Debug output", action="store_true")
     parser.add_argument("-t", "--trace", help="Trace output", action="store_true")
@@ -442,13 +440,14 @@ def main():
             logger.debug(f"Can not create {aws_shared_credentials_file}. Exception: {e}")
             halt(f"{aws_shared_credentials_file} file does not exist. Please create one and try again.")
 
-    try:
-        assert shutil.which(aws_bin) is not None, f"Can not find AWS CLI v2 `{aws_bin}` command."
-        assert os.path.exists(aws_config_file), f"{aws_config_file} does not exist"
-        assert os.path.exists(aws_shared_credentials_file), f"{aws_shared_credentials_file} does not exist"
-        assert os.path.exists(aws_sso_cache_path), f"{aws_sso_cache_path} does not exist"
-    except AssertionError as e:
-        halt(e)
+    if not os.path.exists(aws_config_file):
+        halt(f"{aws_config_file} does not exist")
+
+    if not os.path.exists(aws_sso_cache_path):
+        halt(f"{aws_sso_cache_path} does not exist")
+
+    if shutil.which(aws_bin) is None:
+        halt(f"Can not find AWS CLI v2 `{aws_bin}` command.")
 
     cmd_aws_cli_version = f"{aws_bin} --version"
     aws_cli_success, aws_cli_version_output = invoke(cmd_aws_cli_version)

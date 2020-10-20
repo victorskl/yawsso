@@ -735,7 +735,7 @@ class CLIUnitTests(TestCase):
 
     def test_invoke_cmd_success(self):
         unstub()
-        success, output = cli.invoke(f"aws --version")
+        success, output = cli.invoke("aws --version")
         logger.info(output)
         self.assertTrue(success)
 
@@ -743,7 +743,7 @@ class CLIUnitTests(TestCase):
         unstub()
         mock_proc_error = cli.subprocess.CalledProcessError(1, "aws space get-mars", b"me-sah, jar jar binks!")
         when(cli.subprocess).check_output(...).thenRaise(mock_proc_error)
-        success, output = cli.invoke(f"aws space get-mars")
+        success, output = cli.invoke("aws space get-mars")
         logger.info(output)
         self.assertTrue(not success)
 
@@ -753,9 +753,9 @@ class CLIUnitTests(TestCase):
         mock_proc.stdout = mock()
         mock_proc.stderr = mock()
         mock_proc.stdout.readline = lambda: print('sky walker\nlight saber\nEOF')
-        mock_proc.stderr.readlines = lambda: list()
+        mock_proc.stderr.readlines = lambda: []
         when(cli.subprocess).Popen(...).thenReturn(mock_proc)
-        success = cli.poll(f"aws space get-lunar")
+        success = cli.poll("aws space get-lunar")
         self.assertTrue(success)
 
     def test_poll_cmd_fail(self):
@@ -766,7 +766,7 @@ class CLIUnitTests(TestCase):
         mock_proc.stdout.readline = lambda: print('sky walker\nlight saber\nEOF')
         mock_proc.stderr.readlines = lambda: ['ka-boom!']
         when(cli.subprocess).Popen(...).thenReturn(mock_proc)
-        success = cli.poll(f"aws space get-moon")
+        success = cli.poll("aws space get-moon")
         self.assertTrue(not success)
 
     def test_xu(self):
