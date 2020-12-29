@@ -1,5 +1,5 @@
 install:
-	@pip install -e '.[dev,test]' .
+	@pip install '.[dev,test]' .
 
 test:
 	@py.test
