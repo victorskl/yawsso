@@ -176,8 +176,10 @@ def write_config(path, config):
 
 
 def parse_sso_cached_login_expiry(cached_login):
-    datetime_format_in_sso_cached_login = "%Y-%m-%dT%H:%M:%SUTC"
-    expires_utc = datetime.strptime((cached_login["expiresAt"]), datetime_format_in_sso_cached_login)
+    # older versions of aws-cli might use non-standard format with `UTC` instead of `Z`
+    expires_at = cached_login["expiresAt"].replace('UTC', 'Z')
+    datetime_format_in_sso_cached_login = "%Y-%m-%dT%H:%M:%SZ"
+    expires_utc = datetime.strptime(expires_at, datetime_format_in_sso_cached_login)
     return expires_utc
 
 
