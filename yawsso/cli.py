@@ -75,6 +75,7 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     config.set(profile_name, "aws_access_key_id", credentials["accessKeyId"])
     config.set(profile_name, "aws_secret_access_key ", credentials["secretAccessKey"])
     config.set(profile_name, "aws_session_token", credentials["sessionToken"])
+    config.set(profile_name, "aws_security_token", credentials["sessionToken"])
     ts_expires_millisecond = credentials["expiration"]
     dt_utc = str(datetime.utcfromtimestamp(ts_expires_millisecond / 1000.0).isoformat() + '+0000')
     config.set(profile_name, "aws_session_expiration", dt_utc)
