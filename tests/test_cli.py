@@ -790,3 +790,17 @@ class CLIUnitTests(TestCase):
         cmd = cli.append_cli_global_options("aws sso get-role-credentials", ca_bundle_profile)
         logger.info(cmd)
         self.assertIn('--ca-bundle', cmd)
+
+    def test_rename_profile(self):
+        with ArgvContext(program, '-p', 'dev:dev_renamed', '--debug'):
+            cli.main()
+            cred = cli.read_config(self.credentials.name)
+            new_tok = cred['dev_renamed']['aws_session_token']
+            self.assertNotEqual(new_tok, 'tok')
+            self.assertEqual(new_tok, 'VeryLongBase664String==')
+            verify(cli, times=2).invoke(...)
+
+    def test_rename_profile_not_found(self):
+        with ArgvContext(program, '-p', f"{uuid.uuid4().hex}:new_name", '-t'):
+            cli.main()
+        self.assertEqual(len(cli.profiles), 0)
