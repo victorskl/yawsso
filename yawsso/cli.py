@@ -338,12 +338,15 @@ def is_sso_profile(profile):
 def is_source_profile(profile):
     return {"source_profile", "role_arn", "region"} <= profile.keys()
 
-
-def update_profile(profile_name, config):
+def update_profile(profile_name, config, new_profile_name=""):
     profile = load_profile_from_config(profile_name, config)
 
-    logger.log(TRACE, f"Syncing profile... {profile_name}: {profile}")
-
+    if new_profile_name == "":
+        new_profile_name = profile_name
+        logger.log(TRACE, f"Syncing profile... {profile_name}: {profile}")
+    else:
+        logger.log(TRACE, f"Syncing profile... {profile_name}->{new_profile_name}: {profile}")
+        
     if is_sso_profile(profile):
         credentials = fetch_credentials(profile_name, profile)
 
@@ -365,7 +368,7 @@ def update_profile(profile_name, config):
         logger.warning(f"Not an AWS SSO profile nor no source_profile found. Skip syncing profile `{profile_name}`")
         return
 
-    update_aws_cli_v1_credentials(profile_name, profile, credentials)
+    update_aws_cli_v1_credentials(new_profile_name, profile, credentials)
 
     return credentials
 
@@ -521,11 +524,20 @@ def main():
 
     global profiles
     profiles = named_profiles
+    profiles_new_name = dict()
 
     if args.profiles:
         profiles = []
         for np in args.profiles:
-            if np.endswith("*"):
+            if ":" in np:
+                old,new = np.split(":")
+                if old not in named_profiles:
+                    logger.warning(f"Named profile `{old}` is not specified in {aws_config_file} file. Skipping...")
+                    continue
+                logger.debug(f"Renaming profile {old} to {new}")
+                profiles.append(old)
+                profiles_new_name[old] = new
+            elif np.endswith("*"):
                 prefix = np.split("*")[0]
                 logger.log(TRACE, f"Collecting all named profiles start with '{prefix}'")
                 for _p in named_profiles:
@@ -540,6 +552,9 @@ def main():
         logger.debug(f"Syncing named profiles: {profiles}")
 
     for profile_name in profiles:
-        credentials = update_profile(profile_name, config)
+        if profile_name in profiles_new_name:
+            credentials = update_profile(profile_name, config, profiles_new_name[profile_name])
+        else:
+            credentials = update_profile(profile_name, config)
         if export_vars:
             get_export_vars(profile_name, credentials)
