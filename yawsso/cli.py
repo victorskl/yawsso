@@ -73,7 +73,7 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     config.add_section(profile_name)
     config.set(profile_name, "region", region)
     config.set(profile_name, "aws_access_key_id", credentials["accessKeyId"])
-    config.set(profile_name, "aws_secret_access_key ", credentials["secretAccessKey"])
+    config.set(profile_name, "aws_secret_access_key", credentials["secretAccessKey"])
     config.set(profile_name, "aws_session_token", credentials["sessionToken"])
     config.set(profile_name, "aws_security_token", credentials["sessionToken"])
     ts_expires_millisecond = credentials["expiration"]
@@ -97,10 +97,9 @@ def get_export_vars(profile_name, credentials):
     clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
     clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
     if pyperclip_found:
-        import pyperclip
-
-        pyperclip.copy(clipboard)
-        logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")
+        import pyperclip                                                                    # pragma: no cover
+        pyperclip.copy(clipboard)                                                           # pragma: no cover
+        logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")   # pragma: no cover
     else:
         logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
         print(clipboard)  # print is intentional, i.e. not to clutter with logger
@@ -338,6 +337,7 @@ def is_sso_profile(profile):
 def is_source_profile(profile):
     return {"source_profile", "role_arn", "region"} <= profile.keys()
 
+
 def update_profile(profile_name, config, new_profile_name=""):
     profile = load_profile_from_config(profile_name, config)
 
@@ -346,7 +346,7 @@ def update_profile(profile_name, config, new_profile_name=""):
         logger.log(TRACE, f"Syncing profile... {profile_name}: {profile}")
     else:
         logger.log(TRACE, f"Syncing profile... {profile_name}->{new_profile_name}: {profile}")
-        
+
     if is_sso_profile(profile):
         credentials = fetch_credentials(profile_name, profile)
 
@@ -530,7 +530,7 @@ def main():
         profiles = []
         for np in args.profiles:
             if ":" in np:
-                old,new = np.split(":")
+                old, new = np.split(":")
                 if old not in named_profiles:
                     logger.warning(f"Named profile `{old}` is not specified in {aws_config_file} file. Skipping...")
                     continue
