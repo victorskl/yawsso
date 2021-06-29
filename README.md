@@ -82,6 +82,37 @@ yawsso -h
 
 ## Additional Use Case
 
+### Rename Profile on Sync
+
+- Say, you have the following profile in your `$HOME/.aws/config`:
+```
+[profile dev]
+sso_start_url = https://myorg.awsapps.com/start
+sso_region = ap-southeast-2
+sso_account_id = 123456789012
+sso_role_name = AdministratorAccess
+region = ap-southeast-2
+output = json
+cli_pager =
+```
+
+- You want to populate access token as, say, profile name `foo` in `$HOME/.aws/credentials`:
+```
+[foo]
+region = ap-southeast-2
+aws_access_key_id = XXX
+aws_secret_access_key = XXX
+aws_session_token = XXX
+...
+```
+
+- Do like so:
+```
+yawsso -p dev:foo
+```
+
+- Then, you can `export AWS_PROFILE=foo` and use `foo` profile!
+
 ### Export Tokens
 
 - Use `-e` flag if you want a temporary copy-paste-able time-gated access token for an instance or external machine.
@@ -101,10 +132,17 @@ export AWS_SESSION_TOKEN=xxx
 aws sso login && yawsso -e | pbcopy
 ```
 
-- Otherwise for a named profile, do:
+- Otherwise, for a named profile, do:
 ```commandline
 yawsso -p dev -e
 ```
+
+- Or, right away export credentials into the current shell environment variables, do:
+```
+yawsso -p dev -e | source /dev/stdin 
+```
+
+> Note: ☝️ are mutually exclusive with the following 👇 auto copy into your clipboard. **Choose one, a must!** 
 
 - If you have [`pyperclip`](https://github.com/asweigart/pyperclip) package installed, `yawsso` will copy access tokens to your clipboard instead.
 ```
