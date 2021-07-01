@@ -468,6 +468,8 @@ def main():
 
     config = read_config(aws_config_file)
 
+    profiles_new_name = dict()
+
     if args.command:
         if args.command == "version":
             logger.info(version_help)
@@ -475,10 +477,15 @@ def main():
 
         elif args.command == "login":
             login_profile = "default"
+            login_profile_new_name = ""
             cmd_aws_sso_login = f"{aws_bin} sso login"
 
             if args.profile:
-                login_profile = args.profile
+                if ":" in args.profile:
+                    login_profile, login_profile_new_name = args.profile.split(":")
+                    profiles_new_name[login_profile] = login_profile_new_name
+                else:
+                    login_profile = args.profile
 
             cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
 
@@ -491,16 +498,16 @@ def main():
             # Specific use case: making `yawsso login -e` or `yawsso login --profile NAME -e`
             # to login, sync, print cred then exit
             if export_vars:
-                credentials = update_profile(login_profile, config)
+                credentials = update_profile(login_profile, config, login_profile_new_name)
                 get_export_vars(login_profile, credentials)
                 exit(0)
 
             if args.this:
-                update_profile(login_profile, config)
+                update_profile(login_profile, config, login_profile_new_name)
                 exit(0)
 
             if login_profile == "default" and not export_vars:
-                update_profile("default", config)
+                update_profile("default", config, login_profile_new_name)
 
             # otherwise continue with sync all named profiles below
 
@@ -524,7 +531,6 @@ def main():
 
     global profiles
     profiles = named_profiles
-    profiles_new_name = dict()
 
     if args.profiles:
         profiles = []
