@@ -183,6 +183,11 @@ yawsso login --this
 yawsso login --profile dev --this
 ```
 
+> 👉 Login using named profile dev and sync as foo. See above for more details on renaming, limited to one profile. 
+```
+yawsso login --profile dev:foo
+```
+
 #### Login then Export token
 
 - Exporting access token also support with login subcommand as follows: 
