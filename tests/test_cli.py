@@ -804,3 +804,13 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', f"{uuid.uuid4().hex}:new_name", '-t'):
             cli.main()
         self.assertEqual(len(cli.profiles), 0)
+
+    def test_login_command_rename(self):   
+        when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
+        with ArgvContext(program, '-t', 'login', '--profile', 'dev:dev_renamed'):
+            cli.main()
+        cred = cli.read_config(self.credentials.name)
+        new_tok = cred['dev_renamed']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli, times=1).poll(...)
