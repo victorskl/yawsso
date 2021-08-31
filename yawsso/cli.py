@@ -487,7 +487,7 @@ def main():
                 else:
                     login_profile = args.profile
 
-            cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
+                cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
 
             logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
 
