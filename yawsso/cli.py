@@ -356,9 +356,6 @@ def update_profile(profile_name, config, new_profile_name=""):
         if not is_sso_profile(source_profile):
             logger.warning(f"Your source_profile is not an AWS SSO profile. Skip syncing profile `{profile_name}`")
             return
-        if profile['region'] != source_profile['sso_region']:
-            logger.warning(f"Region mismatch with source_profile AWS SSO region. Skip syncing profile `{profile_name}`")
-            return
         check_sso_cached_login_expires(source_profile_name, source_profile)
         eager_sync_source_profile(source_profile_name, source_profile)
         logger.log(TRACE, f"Fetching credentials using assume role for `{profile_name}`")
