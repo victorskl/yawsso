@@ -368,7 +368,7 @@ class CLIUnitTests(TestCase):
         self.assertEqual(x.exception.code, 1)
 
     def test_not_equal_sso_region(self):
-        with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '-p', 'dev', '-t'):
             # clean up as going to mutate this
             self.config.close()
             # now start new test case
@@ -387,7 +387,13 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.aws_config_file = self.config.name
             cli.main()
-        self.assertEqual(x.exception.code, 1)
+        sso_cache = cli.load_json(self.sso_cache_json.name)
+        cred = cli.read_config(self.credentials.name)
+        tok_now = cred['dev']['aws_session_token']
+        self.assertEqual(tok_now, 'VeryLongBase664String==')     # assert cred updated
+        self.assertEqual(cred['dev']['region'], 'us-east-2')     # assert cred region is same as config region
+        self.assertEqual(sso_cache['region'], 'ap-southeast-2')  # assert sso cache is in another region
+        verify(cli, times=2).invoke(...)
 
     def test_load_json_value_error(self):
         # clean up as going to mutate this
@@ -474,8 +480,8 @@ class CLIUnitTests(TestCase):
             cli.main()
         cred = cli.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
-        self.assertEqual(tok_now, 'tok')  # assert no update
-        verify(cli, times=1).invoke(...)
+        self.assertEqual(tok_now, 'VeryLongBase664String==')  # assert cross region is allowed and cred updated
+        verify(cli, times=4).invoke(...)
 
     def test_source_profile_eager_sync(self):
         with ArgvContext(program, '-t', '-p', 'dev'):

@@ -53,9 +53,6 @@ def get_aws_cli_v2_sso_cached_login(profile):
         if data.get("startUrl") != profile["sso_start_url"]:
             logger.log(TRACE, f"Not equal SSO start url, skip: {file_path}")
             continue
-        if data.get("region") != profile["sso_region"]:
-            logger.log(TRACE, f"Not equal SSO region, skip: {file_path}")
-            continue
         logger.log(TRACE, f"Using cached SSO login: {file_path}")
         return data
 
