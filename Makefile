@@ -3,7 +3,7 @@ install:
 	@pre-commit install
 
 check:
-	@trufflehog --only-verified git file://.
+	@trufflehog --debug --only-verified git file://./ --since-commit main --branch HEAD --fail
 	@pre-commit run --all-files
 
 test:
