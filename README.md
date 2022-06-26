@@ -1,7 +1,19 @@
 # yawsso
 
-[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions) [![Build Status](https://travis-ci.org/victorskl/yawsso.svg?branch=main)](https://travis-ci.org/victorskl/yawsso) [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=main)](https://codecov.io/gh/victorskl/yawsso?branch=main) [![Coverage Status](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=main)](https://coveralls.io/github/victorskl/yawsso?branch=main) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/e02d74942ed143a381603cd60ba4f64b)](https://app.codacy.com/manual/victorskl/yawsso?utm_source=github.com&utm_medium=referral&utm_content=victorskl/yawsso&utm_campaign=Badge_Grade_Dashboard) [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/context:python) [![Total alerts](https://img.shields.io/lgtm/alerts/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/alerts/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/yawsso?style=flat)](https://pypistats.org/packages/yawsso) [![PyPI](https://img.shields.io/pypi/v/yawsso?style=flat)](https://pypi.org/project/yawsso) 
+[![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions/workflows/prbuild.yml) 
+[![CodeQL](https://github.com/victorskl/yawsso/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/victorskl/yawsso/actions/workflows/codeql-analysis.yml) 
+[![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=main)](https://codecov.io/gh/victorskl/yawsso?branch=main)
+[![coveralls.io](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=main)](https://coveralls.io/github/victorskl/yawsso?branch=main)
+[![codeclimate - Test Coverage](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/test_coverage)](https://codeclimate.com/github/victorskl/yawsso/test_coverage)
+[![codeclimate - Maintainability](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/maintainability)](https://codeclimate.com/github/victorskl/yawsso/maintainability)
+[![lgtm - Language grade: Python](https://img.shields.io/lgtm/grade/python/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/context:python) 
+[![lgtm - Total alerts](https://img.shields.io/lgtm/alerts/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/alerts/) 
+[![snyk](https://snyk.io/advisor/python/yawsso/badge.svg)](https://snyk.io/advisor/python/yawsso) 
+[![kandi](https://img.shields.io/badge/kandi-X--Ray%20Report-ff69b4)](https://kandi.openweaver.com/python/victorskl/yawsso) 
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/yawsso?style=flat)](https://pypistats.org/packages/yawsso) 
+[![PyPI](https://img.shields.io/pypi/v/yawsso?style=flat)](https://pypi.org/project/yawsso)
 [![PyPI - License](https://img.shields.io/pypi/l/yawsso?style=flat)](https://opensource.org/licenses/MIT)
+
 
 Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 credentials.
 

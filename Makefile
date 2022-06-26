@@ -1,5 +1,10 @@
 install:
 	@pip install '.[dev,test]' .
+	@pre-commit install
+
+check:
+	@trufflehog --only-verified git file://.
+	@pre-commit run --all-files
 
 test:
 	@py.test
@@ -8,7 +13,10 @@ unit:
 	@python -m unittest
 
 coverage:
-	@coverage run --source=yawsso -m pytest tests/
+	@coverage run --source=yawsso -m pytest --cov-report xml tests/
+
+coveralls: coverage
+	@coveralls
 
 tox:
 	@tox -vv
@@ -29,16 +37,22 @@ doc:
 	@py.test --cov-report html:local/coverage --cov=yawsso tests/
 	@py.test --cov-report xml:local/coverage.xml --cov=yawsso tests/
 
+clean:
+	@rm -rf build/
+	@rm -rf yawsso.egg-info/
+
 .PHONY: dist
-dist:
-	@python setup.py sdist bdist_wheel
+dist: clean
+	@python3 -m build
 
 # Usage: make ver version=0.1.0
 ver: dist/yawsso-$(version).tar.gz
 	@echo $(version)
 
 testpypi: dist/yawsso-$(version).tar.gz
-	@twine upload --repository testpypi --sign dist/yawsso-$(version)*
+	@python3 -m twine upload --repository testpypi --sign dist/yawsso-$(version).*
+	@python3 -m twine upload --repository testpypi --sign dist/yawsso-$(version)-*
 
 pypi: dist/yawsso-$(version).tar.gz
-	@twine upload --sign dist/yawsso-$(version)*
+	@python3 -m twine upload --sign dist/yawsso-$(version).*
+	@python3 -m twine upload --sign dist/yawsso-$(version)-*
