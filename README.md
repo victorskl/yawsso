@@ -127,13 +127,15 @@ yawsso -p dev:foo
 
 ### Export Tokens
 
-- Use `-e` flag if you want a temporary copy-paste-able time-gated access token for an instance or external machine.
+> 🤚 PLEASE USE THIS FEATURE WITH CARE SINCE **ENVIRONMENT VARIABLES USED ON SHARED SYSTEMS CAN GIVE UNAUTHORIZED ACCESS TO PRIVATE RESOURCES**.
 
-> 🤚 PLEASE USE THIS FEATURE WITH CARE SINCE **ENVIRONMENT VARIABLES USED ON SHARED SYSTEMS CAN GIVE UNAUTHORIZED ACCESS TO PRIVATE RESOURCES**:
+> START FROM VERSION 1.0.0, `yawsso -e` EXPORT TOKENS IN **BASE64 ENCODED STRING** INSTEAD.
+
+- Use `-e` flag if you want a temporary copy-paste-able time-gated access token for an instance or external machine.
 
 - Please note that, it uses `default` profile if no additional arguments pass.
 ```
-yawsso -e
+yawsso -e | base64 -d
 export AWS_ACCESS_KEY_ID=xxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_SESSION_TOKEN=xxx
@@ -141,17 +143,17 @@ export AWS_SESSION_TOKEN=xxx
 
 - This use case is especially tailored for those who use `default` profile and, who would like to PIPE commands as follows.
 ```
-aws sso login && yawsso -e | pbcopy
+aws sso login && yawsso -e | base64 -d | pbcopy
 ```
 
 - Otherwise, for a named profile, do:
-```commandline
-yawsso -p dev -e
+```
+yawsso -p dev -e | base64 -d
 ```
 
 - Or, right away export credentials into the current shell environment variables, do:
 ```
-yawsso -p dev -e | source /dev/stdin 
+yawsso -p dev -e | base64 -d | source /dev/stdin
 ```
 
 > Note: ☝️ are mutually exclusive with the following 👇 auto copy into your clipboard. **Choose one, a must!** 
@@ -206,12 +208,12 @@ yawsso login --profile dev:foo
 
 > 👉 Login using default profile, sync only upto **this** default profile and, print access token
 ```
-yawsso login -e
+yawsso login -e | base64 -d
 ```
 
 > 👉 Login using named profile dev, sync only upto **this** dev profile and, print access token
 ```
-yawsso login --profile dev -e
+yawsso login --profile dev -e | base64 -d
 ```
 
 ## Develop

@@ -1,4 +1,5 @@
 import argparse
+import base64
 import json
 import logging
 import os
@@ -99,7 +100,8 @@ def get_export_vars(profile_name, credentials):
         logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")   # pragma: no cover
     else:
         logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
-        print(clipboard)  # print is intentional, i.e. not to clutter with logger
+        encoded_clipboard = base64.b64encode(clipboard.encode("utf-8")).decode("utf-8")
+        print(encoded_clipboard)  # print is intentional, i.e. not to clutter with logger
 
 
 def halt(error):

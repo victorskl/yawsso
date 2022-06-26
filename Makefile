@@ -4,6 +4,7 @@ install:
 
 check:
 	@trufflehog --debug --only-verified git file://./ --since-commit main --branch HEAD --fail
+	@ggshield secret scan repo .
 	@pre-commit run --all-files
 
 test:
