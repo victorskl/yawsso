@@ -125,7 +125,7 @@ class CLIUnitTests(TestCase):
             'roleCredentials':
                 {
                     'accessKeyId': 'does-not-matter',
-                    'secretAccessKey': 'does-not-matter',
+                    'secretAccessKey': '',
                     'sessionToken': 'VeryLongBase664String==',
                     'expiration': datetime.utcnow().timestamp()
                 }
@@ -134,7 +134,7 @@ class CLIUnitTests(TestCase):
         mock_assume_role = {
             "Credentials": {
                 "AccessKeyId": "does-not-matter",
-                "SecretAccessKey": "does-not-matter",
+                "SecretAccessKey": "",
                 "SessionToken": "VeryLongBase664String==",
                 "Expiration": "2020-06-13T17:15:23+00:00"
             },
@@ -172,7 +172,7 @@ class CLIUnitTests(TestCase):
         }
 
         mock_success = True
-        mock_cli_v2 = 'aws-cli/2.0.9 Python/3.8.2 Darwin/19.4.0 botocore/2.0.0dev13 (MOCK)'
+        mock_cli_v2 = 'aws-cli/2.7.10 Python/3.9.13 Darwin/21.5.0 source/x86_64 prompt/off (MOCK)'
         when(cli).invoke(contains('aws --version')).thenReturn((mock_success, mock_cli_v2))
         when(cli).invoke(contains('aws sts get-caller-identity')).thenReturn((mock_success, 'does-not-matter'))
         when(cli).invoke(contains('aws sso get-role-credentials')).thenReturn((mock_success, json.dumps(mock_output)))

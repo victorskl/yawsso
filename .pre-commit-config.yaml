@@ -1,0 +1,42 @@
+repos:
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.2.0
+    hooks:
+      - id: detect-secrets
+        name: detect secrets
+        args: [ '--baseline', '.secrets.baseline' ]
+        exclude: yarn.lock
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.1.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-json
+      - id: check-yaml
+#      - id: detect-aws-credentials
+      - id: detect-private-key
+#      - id: no-commit-to-branch
+#        args: [ --branch, main, --branch, master, --pattern, release/.* ]
+
+#  - repo: local
+#    hooks:
+#      - id: yarn-audit
+#        name: yarn audit
+#        entry: npx yarn audit --groups dependencies
+#        language: system
+#        pass_filenames: false
+
+#  - repo: local
+#    hooks:
+#      - id: trufflehog-git
+#        name: trufflehog git
+#        entry: trufflehog --debug git file://.
+#        language: system
+#        pass_filenames: false
+
+#  - repo: https://github.com/psf/black
+#    rev: 22.1.0
+#    hooks:
+#      - id: black
+#        language_version: python3.9

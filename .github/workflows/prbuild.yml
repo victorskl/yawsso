@@ -4,43 +4,76 @@ on:
   push:
     branches:
       - main
-      - dev
+
   pull_request:
     branches:
       - main
-      - dev
+
+# Actions Used:
+#  https://github.com/actions/setup-python#usage
+#  https://github.com/marketplace/actions/codecov
+#  https://github.com/marketplace/actions/code-climate-coverage-action
+#  https://docs.codeclimate.com/docs/github-actions-test-coverage
+#  https://github.com/marketplace/actions/trufflehog-oss
 
 jobs:
   build:
 
+    # Default access (restricted) - https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+    permissions:
+      contents: read
+
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [ '3.6', '3.7', '3.8', '3.9', '3.10' ]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        sudo apt-get install xclip xvfb
-        python -m pip install --upgrade pip
-        pip install '.[test]' .
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        xvfb-run pytest --cov-report xml --cov=yawsso tests/
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: yawsso
+      - uses: actions/checkout@v3
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@v3.4.3
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install xclip xvfb
+          python -m pip install --upgrade pip
+          pip install '.[test]' .
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest
+        run: |
+          xvfb-run pytest --cov-report xml --cov=yawsso tests/
+
+      - name: Publish coverage to to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: yawsso
+
+      - name: Publish coverage to CodeClimate
+        uses: paambaati/codeclimate-action@v3.0.0
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+        with:
+          coverageLocations: |
+            ${{ github.workspace }}/coverage.xml:coverage.py
+
+      - name: Publish coverage to Coveralls
+        run: coveralls
