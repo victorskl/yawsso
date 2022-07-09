@@ -4,8 +4,10 @@ import pathlib
 import tempfile
 import uuid
 from datetime import datetime, timedelta
+from io import StringIO
 from random import randint
 from unittest import TestCase
+from unittest.mock import patch
 
 from cli_test_helpers import ArgvContext
 from mockito import unstub, when, contains, verify, mock
@@ -390,8 +392,8 @@ class CLIUnitTests(TestCase):
         sso_cache = cli.load_json(self.sso_cache_json.name)
         cred = cli.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
-        self.assertEqual(tok_now, 'VeryLongBase664String==')     # assert cred updated
-        self.assertEqual(cred['dev']['region'], 'us-east-2')     # assert cred region is same as config region
+        self.assertEqual(tok_now, 'VeryLongBase664String==')  # assert cred updated
+        self.assertEqual(cred['dev']['region'], 'us-east-2')  # assert cred region is same as config region
         self.assertEqual(sso_cache['region'], 'ap-southeast-2')  # assert sso cache is in another region
         verify(cli, times=2).invoke(...)
 
@@ -737,6 +739,20 @@ class CLIUnitTests(TestCase):
             cli.main()
         self.assertEqual(x.exception.code, 2)
 
+    @patch("sys.stdin", StringIO("Hello\n"))
+    def test_encrypt_command(self):
+        unstub()
+        with ArgvContext(program, 'encrypt'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+
+    @patch("sys.stdin", StringIO("Uryyb\n"))
+    def test_decrypt_command(self):
+        unstub()
+        with ArgvContext(program, 'decrypt'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+
     # below are subprocess cmd call tests, better keep them at last
 
     def test_invoke_cmd_success(self):
@@ -811,7 +827,7 @@ class CLIUnitTests(TestCase):
             cli.main()
         self.assertEqual(len(cli.profiles), 0)
 
-    def test_login_command_rename(self):   
+    def test_login_command_rename(self):
         when(cli).poll(contains('aws sso login'), ...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev:dev_renamed'):
             cli.main()

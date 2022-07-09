@@ -1,5 +1,5 @@
 import argparse
-import base64
+import codecs
 import json
 import logging
 import os
@@ -14,6 +14,8 @@ from importlib import util as importlib_util
 from pathlib import Path
 
 import yawsso
+
+ROT_13 = "rot13"
 
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
@@ -82,6 +84,14 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
 
 
+def encrypt(obj: str):
+    return codecs.encode(obj, encoding=ROT_13)
+
+
+def decrypt(obj):
+    return codecs.decode(obj, encoding=ROT_13)
+
+
 def get_export_vars(profile_name, credentials):
     if credentials is None:
         logger.warning(f"No appropriate credentials found for profile '{profile_name}'. "
@@ -100,8 +110,7 @@ def get_export_vars(profile_name, credentials):
         logger.info(f"Credentials copied to your clipboard for profile '{profile_name}'")   # pragma: no cover
     else:
         logger.debug("Clipboard module pyperclip is not installed, showing credentials on terminal instead")
-        encoded_clipboard = base64.b64encode(clipboard.encode("utf-8")).decode("utf-8")
-        print(encoded_clipboard)  # print is intentional, i.e. not to clutter with logger
+        print(encrypt(clipboard))
 
 
 def halt(error):
@@ -397,6 +406,8 @@ def main():
     login_command.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
     login_command.add_argument("--profile", help="Login profile name (use `default` if absent)", metavar="")
     login_command.add_argument("--this", action="store_true", help="Only sync this login profile")
+    sp.add_parser("encrypt", help=f"Encrypt ({ROT_13.upper()}) stdin and exit")
+    sp.add_parser("decrypt", help=f"Decrypt ({ROT_13.upper()}) stdin and exit")
     sp.add_parser("version", help="Print version and exit")
 
     args = parser.parse_args()
@@ -469,6 +480,16 @@ def main():
     if args.command:
         if args.command == "version":
             logger.info(version_help)
+            exit(0)
+
+        elif args.command == "encrypt":
+            for line in sys.stdin:
+                print(encrypt(line.rstrip("\n")))
+            exit(0)
+
+        elif args.command == "decrypt":
+            for line in sys.stdin:
+                print(decrypt(line.rstrip("\n")))
             exit(0)
 
         elif args.command == "login":
