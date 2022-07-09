@@ -17,6 +17,8 @@
 
 Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 credentials.
 
+> See also [Release v1.0.0 Notes](https://github.com/victorskl/yawsso/wiki#release-100-notes)
+
 ## Prerequisite
 
 - Required `Python >= 3.6`
@@ -92,7 +94,7 @@ yawsso -h
     - `sqsmover -s main-dlq -d main-queue`
     - `ecs-cli ps --cluster my-cluster`
 
-## Additional Use Case
+## Additional Use Cases
 
 ### Rename Profile on Sync
 
@@ -127,15 +129,15 @@ yawsso -p dev:foo
 
 ### Export Tokens
 
-> 🤚 PLEASE USE THIS FEATURE WITH CARE SINCE **ENVIRONMENT VARIABLES USED ON SHARED SYSTEMS CAN GIVE UNAUTHORIZED ACCESS TO PRIVATE RESOURCES**.
+> PLEASE USE THIS FEATURE WITH CARE SINCE **ENVIRONMENT VARIABLES USED ON SHARED SYSTEMS CAN GIVE UNAUTHORIZED ACCESS TO PRIVATE RESOURCES**.
 
-> START FROM VERSION 1.0.0, `yawsso -e` EXPORT TOKENS IN **BASE64 ENCODED STRING** INSTEAD.
+> 🤚 START FROM VERSION `1.0.0`, `yawsso -e` EXPORT TOKENS IN **ROT13** ENCODED STRING.
 
 - Use `-e` flag if you want a temporary copy-paste-able time-gated access token for an instance or external machine.
 
 - Please note that, it uses `default` profile if no additional arguments pass.
 ```
-yawsso -e | base64 -d
+yawsso -e | yawsso decrypt
 export AWS_ACCESS_KEY_ID=xxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_SESSION_TOKEN=xxx
@@ -143,17 +145,17 @@ export AWS_SESSION_TOKEN=xxx
 
 - This use case is especially tailored for those who use `default` profile and, who would like to PIPE commands as follows.
 ```
-aws sso login && yawsso -e | base64 -d | pbcopy
+aws sso login && yawsso -e | yawsso decrypt | pbcopy
 ```
 
 - Otherwise, for a named profile, do:
 ```
-yawsso -p dev -e | base64 -d
+yawsso -p dev -e | yawsso decrypt
 ```
 
 - Or, right away export credentials into the current shell environment variables, do:
 ```
-yawsso -p dev -e | base64 -d | source /dev/stdin
+yawsso -p dev -e | yawsso decrypt | source /dev/stdin
 ```
 
 > Note: ☝️ are mutually exclusive with the following 👇 auto copy into your clipboard. **Choose one, a must!** 
@@ -173,7 +175,7 @@ pip install 'yawsso[all]'
 
 - You can also use `yawsso` subcommand `login` to SSO login then sync all in one go.
 
-> 🙋‍♂️ NOTE: It uses `default` profile if optional argument `--profile` is absent
+> 🙋‍♂️ NOTE: It uses `default` profile or `AWS_PROFILE` environment variable if optional argument `--profile` is absent
 
 ```commandline
 yawsso login -h
@@ -208,12 +210,43 @@ yawsso login --profile dev:foo
 
 > 👉 Login using default profile, sync only upto **this** default profile and, print access token
 ```
-yawsso login -e | base64 -d
+yawsso login -e | yawsso decrypt
 ```
 
 > 👉 Login using named profile dev, sync only upto **this** dev profile and, print access token
 ```
-yawsso login --profile dev -e | base64 -d
+yawsso login --profile dev -e | yawsso decrypt
+```
+
+### Encryption
+
+`yawsso` can encrypt and decrypt some arbitrary string from `stdin` using [ROT13](https://en.wikipedia.org/wiki/ROT13) (_a simple letter substitution cipher_) as follows.
+
+```
+yawsso encrypt <<< 'Hello this is a test'
+Uryyb guvf vf n grfg
+
+yawsso decrypt <<< 'Uryyb guvf vf n grfg'
+Hello this is a test
+
+(or Pipe through some text corpus)
+cat test.txt | yawsso encrypt 
+```
+
+This is the same as using trivial Unix `tr` command as follows.
+
+```
+echo 'Hello this is a test' | tr 'A-Za-z' 'N-ZA-Mn-za-m'
+Uryyb guvf vf n grfg
+
+echo 'Uryyb guvf vf n grfg' | tr 'A-Za-z' 'N-ZA-Mn-za-m'
+Hello this is a test
+```
+
+Hence, you could also decode `yawsso` exported tokens using `tr` command, like so.
+
+```
+yawsso -p dev -e | tr 'A-Za-z' 'N-ZA-Mn-za-m'
 ```
 
 ## Develop

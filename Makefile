@@ -7,6 +7,10 @@ check:
 	@ggshield secret scan repo .
 	@pre-commit run --all-files
 
+codeql:
+	@codeql database create --source-root yawsso/ --language=python local/codeqldb --overwrite
+	@codeql query run -d local/codeqldb/ ~/Projects/oss/codeql/python/ql/src/Security/CWE-312/CleartextLogging.ql
+
 test:
 	@py.test
 
