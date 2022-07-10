@@ -725,7 +725,7 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_clipboard_export_vars_2
         """
-        when(cli.extra.importlib_util).find_spec("pyperclip").thenReturn(None)
+        when(cli.utils.importlib_util).find_spec("pyperclip").thenReturn(None)
         with ArgvContext(program, '-t', '-e', '-p', 'dev'):
             cli.main()
         cred = cli.utils.read_config(self.credentials.name)

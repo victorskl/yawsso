@@ -1,12 +1,10 @@
+import copy
 import json
-import logging
 import os
 from configparser import NoSectionError
 from datetime import datetime, timezone
 
-from yawsso import TRACE, Constant, utils as u
-
-logger = logging.getLogger(__name__)
+from yawsso import TRACE, Constant, logger, utils as u
 
 aws_bin = "aws"  # assume `aws` command avail in PATH and is v2. otherwise, allow mutation with -b flag
 profiles = None
@@ -174,16 +172,16 @@ def fetch_credentials_with_assume_role(profile_name, profile):
 
     assume_role_cred = json.loads(role_cred_output)['Credentials']
 
-    _cred = {}
-    _cred.update(accessKeyId=assume_role_cred['AccessKeyId'])
-    _cred.update(secretAccessKey=assume_role_cred['SecretAccessKey'])
-    _cred.update(sessionToken=assume_role_cred['SessionToken'])
+    cred = {}
+    cred.update(accessKeyId=assume_role_cred['AccessKeyId'])
+    cred.update(secretAccessKey=assume_role_cred['SecretAccessKey'])
+    cred.update(sessionToken=assume_role_cred['SessionToken'])
 
-    _expire_utc = parse_assume_role_credentials_expiry(assume_role_cred['Expiration'])
-    _expire_utc_ts_millisecond = int(_expire_utc.replace(tzinfo=timezone.utc).timestamp() * 1000)
-    _cred.update(expiration=_expire_utc_ts_millisecond)
+    expire_utc = parse_assume_role_credentials_expiry(assume_role_cred['Expiration'])
+    expire_utc_ts_millisecond = int(expire_utc.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    cred.update(expiration=expire_utc_ts_millisecond)
 
-    return _cred
+    return copy.deepcopy(cred)
 
 
 def eager_sync_source_profile(source_profile_name, source_profile):

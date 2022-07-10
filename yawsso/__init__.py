@@ -10,6 +10,7 @@ PROGRAM = 'yawsso'  # pragma: no cover
 
 TRACE = 5
 logging.addLevelName(TRACE, 'TRACE')
+logger = logging.getLogger(__name__)
 
 
 class Constant(Enum):
@@ -19,3 +20,4 @@ class Constant(Enum):
     AWS_SHARED_CREDENTIALS_FILE = f"{Path.home()}/.aws/credentials"
     AWS_DEFAULT_REGION = "us-east-1"
     ROT_13 = "rot13"
+    VERSION_HELP = f"{PROGRAM} {VERSION}"

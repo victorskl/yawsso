@@ -5,21 +5,19 @@ import shutil
 import sys
 from pathlib import Path
 
-from yawsso import Constant, VERSION, PROGRAM, TRACE, core, extra, utils
-
-logger = logging.getLogger(__name__)
+from yawsso import PROGRAM, TRACE, Constant, logger, core, utils, cmd
 
 
-def main():
+def _boot():
     handler = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter('%(message)s')  # print UNIX friendly format for PIPE use case
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-    version_help = f"{PROGRAM} {VERSION}"
-    description = "Sync all named profiles when calling without any arguments"
-    parser = argparse.ArgumentParser(prog=PROGRAM, description=description)
+    parser = argparse.ArgumentParser(
+        prog=PROGRAM, description="Sync all named profiles when calling without any arguments"
+    )
     parser.add_argument("--default", action="store_true", help="Sync AWS default profile and all named profiles")
     parser.add_argument("--default-only", action="store_true", help="Sync AWS default profile only and exit")
     parser.add_argument("-p", "--profiles", nargs="*", metavar="", help="Sync specified AWS named profiles")
@@ -44,6 +42,10 @@ def main():
 
     args = parser.parse_args()
 
+    if args.version:
+        logger.info(Constant.VERSION_HELP.value)
+        exit(0)  # just version print, don't even bother all the rest
+
     if args.trace:
         formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
         handler.setFormatter(formatter)
@@ -56,24 +58,21 @@ def main():
         logger.setLevel(logging.DEBUG)
         logger.debug("Logging level: DEBUG")
 
+    if args.bin:
+        core.aws_bin = args.bin
+
     logger.log(TRACE, f"args: {args}")
     logger.log(TRACE, f"AWS_CONFIG_FILE: {core.aws_config_file}")
     logger.log(TRACE, f"AWS_SHARED_CREDENTIALS_FILE: {core.aws_shared_credentials_file}")
     logger.log(TRACE, f"AWS_SSO_CACHE_PATH: {core.aws_sso_cache_path}")
     logger.log(TRACE, f"Cache SSO JSON files: {utils.list_directory(core.aws_sso_cache_path)}")
 
-    # Make export_vars avail either side of subcommand
-    x_vars = args.export_vars if hasattr(args, 'export_vars') and args.export_vars else False
-    x_vars1 = args.export_vars1 if hasattr(args, 'export_vars1') and args.export_vars1 else False
-    export_vars = x_vars or x_vars1
+    _preflight()
 
-    if args.version:
-        logger.info(version_help)
-        exit(0)
+    return cmd.Command(args=args)
 
-    if args.bin:
-        core.aws_bin = args.bin
 
+def _preflight():
     if not os.path.exists(core.aws_shared_credentials_file):
         logger.debug(f"{core.aws_shared_credentials_file} file does not exist. Attempting to create one.")
         try:
@@ -104,110 +103,65 @@ def main():
 
     logger.debug(aws_cli_version_output)
 
-    config = utils.read_config(core.aws_config_file)
 
-    profiles_new_name = dict()
+def main():
+    co = _boot()
 
-    if args.command:
-        if args.command == "version":
-            logger.info(version_help)
-            exit(0)
+    if co.args.command:
+        co.dispatch()  # subcommand dispatch
 
-        elif args.command == "encrypt":
-            for line in sys.stdin:
-                print(extra.encrypt(line.rstrip("\n")))
-            exit(0)
-
-        elif args.command == "decrypt":
-            for line in sys.stdin:
-                print(extra.decrypt(line.rstrip("\n")))
-            exit(0)
-
-        elif args.command == "login":
-            login_profile = "default"
-            login_profile_new_name = ""
-            cmd_aws_sso_login = f"{core.aws_bin} sso login"
-
-            if args.profile:
-                if ":" in args.profile:
-                    login_profile, login_profile_new_name = args.profile.split(":")
-                    profiles_new_name[login_profile] = login_profile_new_name
-                else:
-                    login_profile = args.profile
-
-                cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
-
-            logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
-
-            login_success = utils.poll(cmd_aws_sso_login, output=not export_vars)
-            if not login_success:
-                utils.halt(f"Error running command: `{cmd_aws_sso_login}`")
-
-            # Specific use case: making `yawsso login -e` or `yawsso login --profile NAME -e`
-            # to login, sync, print cred then exit
-            if export_vars:
-                credentials = core.update_profile(login_profile, config, login_profile_new_name)
-                extra.get_export_vars(login_profile, credentials)
-                exit(0)
-
-            if args.this:
-                core.update_profile(login_profile, config, login_profile_new_name)
-                exit(0)
-
-            if login_profile == "default" and not export_vars:
-                core.update_profile("default", config, login_profile_new_name)
-
-            # otherwise continue with sync all named profiles below
+    # then continue with sync all named profiles below if subcommand does not happen to exit the program yet
 
     # Specific use case: making `yawsso -e` behaviour to sync default profile, print cred then exit
-    if export_vars and not args.default and not args.profiles and not hasattr(args, 'profile'):
-        credentials = core.update_profile("default", config)
-        extra.get_export_vars("default", credentials)
+    if co.export_vars and not co.args.default and not co.args.profiles and not hasattr(co.args, 'profile'):
+        credentials = core.update_profile("default", co.config)
+        utils.get_export_vars("default", credentials)
         exit(0)
 
     # Specific use case: two flags to take care of default profile sync behaviour
-    if args.default or args.default_only:
-        credentials = core.update_profile("default", config)
-        if export_vars:
-            extra.get_export_vars("default", credentials)
-        if args.default_only:
+    if co.args.default or co.args.default_only:
+        credentials = core.update_profile("default", co.config)
+        if co.export_vars:
+            utils.get_export_vars("default", credentials)
+        if co.args.default_only:
             exit(0)
 
-    named_profiles = list(map(lambda p: p.replace("profile ", ""), filter(lambda s: s != "default", config.sections())))
-    if len(named_profiles) > 0:
-        logger.debug(f"Current named profiles in config: {str(named_profiles)}")
+    # Main use case: sync all named profiles
+    n_profiles = list(map(lambda p: p.replace("profile ", ""), filter(lambda s: s != "default", co.config.sections())))
+    logger.debug(f"Current named profiles in config: {str(n_profiles)}")
 
-    core.profiles = named_profiles
+    core.profiles = n_profiles
 
-    if args.profiles:
+    if co.args.profiles:
         profiles = []
-        for np in args.profiles:
+        for np in co.args.profiles:
             if ":" in np:
                 old, new = np.split(":")
-                if old not in named_profiles:
+                if old not in n_profiles:
                     logger.warning(f"Named profile `{old}` is not specified in {core.aws_config_file}. Skipping...")
                     continue
                 logger.debug(f"Renaming profile {old} to {new}")
                 profiles.append(old)
-                profiles_new_name[old] = new
+                co.profiles_new_name[old] = new
             elif np.endswith("*"):
                 prefix = np.split("*")[0]
                 logger.log(TRACE, f"Collecting all named profiles start with '{prefix}'")
-                for _p in named_profiles:
-                    if _p.startswith(prefix):
-                        profiles.append(_p)
+                profiles.extend(list(filter(lambda _p: _p.startswith(prefix), n_profiles)))
             else:
-                if np not in named_profiles:
+                if np not in n_profiles:
                     logger.warning(f"Named profile `{np}` is not specified in {core.aws_config_file}. Skipping...")
                     continue
                 profiles.append(np)
+        # end for
         core.profiles = list(set(profiles))  # dedup
-        logger.debug(f"Syncing named profiles: {core.profiles}")
 
+    logger.debug(f"Syncing named profiles: {str(core.profiles)}")
     for profile_name in core.profiles:
-        if profile_name in profiles_new_name:
-            credentials = core.update_profile(profile_name, config, profiles_new_name[profile_name])
+        if profile_name in co.profiles_new_name:
+            credentials = core.update_profile(profile_name, co.config, co.profiles_new_name[profile_name])
         else:
-            credentials = core.update_profile(profile_name, config)
-        if export_vars:
-            extra.get_export_vars(profile_name, credentials)
+            credentials = core.update_profile(profile_name, co.config)
+
+        # a bit awkward but if user wish to
+        if co.export_vars:
+            utils.get_export_vars(profile_name, credentials)
