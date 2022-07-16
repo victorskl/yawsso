@@ -772,33 +772,42 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev'):
             cli.main()
         cred = cli.utils.read_config(self.credentials.name)
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)
 
     def test_login_command_default(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_default
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', 'login'):
             cli.main()
         cred = cli.utils.read_config(self.credentials.name)
         new_tok = cred['default']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)
 
     def test_login_command_this(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_this
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev', '--this'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
@@ -806,13 +815,16 @@ class CLIUnitTests(TestCase):
         new_tok = cred['dev']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)
 
     def test_login_command_fail(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_fail
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(False)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(False)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev', '--this'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 1)
@@ -825,7 +837,10 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_export_vars
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '-e'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
@@ -833,13 +848,16 @@ class CLIUnitTests(TestCase):
         new_tok = cred['default']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)
 
     def test_login_command_export_vars_2(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_export_vars_2
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', '-e', 'login'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
@@ -847,7 +865,7 @@ class CLIUnitTests(TestCase):
         new_tok = cred['default']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)
 
     def test_version_command(self):
         """
@@ -918,7 +936,7 @@ class CLIUnitTests(TestCase):
         mock_proc.stdout.readline = lambda: print('sky walker\nlight saber\nEOF')
         mock_proc.stderr.readlines = lambda: []
         when(cli.utils.subprocess).Popen(...).thenReturn(mock_proc)
-        success = cli.utils.poll("aws space get-lunar")
+        success = cli.utils.Poll("aws space get-lunar").start().resolve()
         self.assertTrue(success)
 
     def test_poll_cmd_fail(self):
@@ -932,7 +950,7 @@ class CLIUnitTests(TestCase):
         mock_proc.stdout.readline = lambda: print('sky walker\nlight saber\nEOF')
         mock_proc.stderr.readlines = lambda: ['ka-boom!']
         when(cli.utils.subprocess).Popen(...).thenReturn(mock_proc)
-        success = cli.utils.poll("aws space get-moon")
+        success = cli.utils.Poll("aws space get-moon").start().resolve()
         self.assertTrue(not success)
 
     def test_xu(self):
@@ -990,11 +1008,14 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_login_command_rename
         """
-        when(cli.utils).poll(contains('aws sso login'), ...).thenReturn(True)
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
         with ArgvContext(program, '-t', 'login', '--profile', 'dev:dev_renamed'):
             cli.main()
         cred = cli.utils.read_config(self.credentials.name)
         new_tok = cred['dev_renamed']['aws_session_token']
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
-        verify(cli.utils, times=1).poll(...)
+        verify(cli.utils, times=1).Poll(...)

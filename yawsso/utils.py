@@ -32,31 +32,40 @@ def invoke(cmd):
     return success, output.strip('\n')
 
 
-def poll(cmd, output=True):
-    proc = subprocess.Popen(
-        shlex.split(cmd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
+class Poll(object):
 
-    success = True
+    def __init__(self, cmd, output=True):
+        self.cmd = cmd
+        self.output = output
 
-    while True:
-        line = proc.stdout.readline()
-        if not line:
-            break
-        line = line.rstrip('\n')  # pragma: no cover
-        if line != "" and output:  # pragma: no cover
-            logger.info(line)  # pragma: no cover
+        self._proc = subprocess.Popen(
+            shlex.split(self.cmd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
 
-    for line in proc.stderr.readlines():
-        line = line.rstrip('\n')
-        if line != "":
-            logger.error(line)
-            success = False
+    def _out(self, line):
+        if line != "" and self.output:  # pragma: no cover
+            logger.info(line)  # pragma: no
 
-    return success
+    def start(self):
+        while True:
+            line = self._proc.stdout.readline()
+            if not line:
+                break
+            line = line.rstrip('\n')  # pragma: no cover
+            self._out(line)  # pragma: no cover
+        return self
+
+    def resolve(self):
+        success = True
+        for line in self._proc.stderr.readlines():
+            line = line.rstrip('\n')
+            if line != "":
+                logger.error(line)
+                success = False
+        return success
 
 
 def list_directory(path):

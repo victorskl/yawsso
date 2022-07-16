@@ -30,7 +30,7 @@ class Command(object):
             DecryptCommand(self).perform()
 
         elif self.args.command == "login":
-            LoginCommand(self).perform()
+            LoginCommand(self).perform().handle()
 
 
 class CommandAction(ABC):
@@ -61,37 +61,53 @@ class DecryptCommand(CommandAction):
 
 class LoginCommand(CommandAction):
 
+    def __init__(self, co):
+        super(LoginCommand, self).__init__(co)
+        self.login_profile = "default"
+        self.login_profile_new_name = ""
+
     def perform(self):
-        login_profile = "default"
-        login_profile_new_name = ""
         cmd_aws_sso_login = f"{core.aws_bin} sso login"
 
         if self.co.args.profile:
             if ":" in self.co.args.profile:
                 # support rename profile upon login then sync use case
-                login_profile, login_profile_new_name = self.co.args.profile.split(":")
-                self.co.profiles_new_name[login_profile] = login_profile_new_name
+                self.login_profile, self.login_profile_new_name = self.co.args.profile.split(":")
+                self.co.profiles_new_name[self.login_profile] = self.login_profile_new_name
             else:
-                login_profile = self.co.args.profile
+                self.login_profile = self.co.args.profile
 
-            cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={login_profile}"
+            cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={self.login_profile}"
 
         logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
 
-        login_success = utils.poll(cmd_aws_sso_login, output=not self.co.export_vars)
+        login_success = utils.Poll(cmd_aws_sso_login, output=not self.co.export_vars).start().resolve()
         if not login_success:
             utils.halt(f"Error running command: `{cmd_aws_sso_login}`")
 
-        # Specific use case: making `yawsso login -e` or `yawsso login --profile NAME -e`
-        # to perform login, sync, print cred then exit
+        return self
+
+    def handle(self):
+        """Handle is just centralised interface hook to exec all extended use cases or flags"""
+        self._handle_flag_e()
+        self._handle_flag_this()
+        self._handle_flag_default()
+
+    def _handle_flag_e(self):
+        """
+        Specific use case: making `yawsso login -e` or `yawsso login --profile NAME -e`
+        to perform login, sync, print cred then exit
+        """
         if self.co.export_vars:
-            credentials = core.update_profile(login_profile, self.co.config, login_profile_new_name)
-            utils.get_export_vars(login_profile, credentials)
+            credentials = core.update_profile(self.login_profile, self.co.config, self.login_profile_new_name)
+            utils.get_export_vars(self.login_profile, credentials)
             exit(0)
 
+    def _handle_flag_this(self):
         if self.co.args.this:
-            core.update_profile(login_profile, self.co.config, login_profile_new_name)
+            core.update_profile(self.login_profile, self.co.config, self.login_profile_new_name)
             exit(0)
 
-        if login_profile == "default" and not self.co.export_vars:
-            core.update_profile("default", self.co.config, login_profile_new_name)
+    def _handle_flag_default(self):
+        if self.login_profile == "default" and not self.co.export_vars:
+            core.update_profile("default", self.co.config, self.login_profile_new_name)
