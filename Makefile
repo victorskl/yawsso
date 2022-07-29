@@ -1,5 +1,5 @@
 install:
-	@pip install '.[dev,test]' .
+	@pip install ".[dev,test]" .
 	@pre-commit install
 
 check:

@@ -1,6 +1,7 @@
 import codecs
 import json
 import os
+import platform
 import shlex
 import subprocess
 from configparser import ConfigParser
@@ -97,11 +98,56 @@ def write_config(path, config):
 
 
 def encrypt(obj: str):
-    return codecs.encode(obj, encoding=Constant.ROT_13.value)
+    return codecs.encode(obj, encoding=str(Constant.ROT_13.value))
 
 
 def decrypt(obj):
-    return codecs.decode(obj, encoding=Constant.ROT_13.value)
+    return codecs.decode(obj, encoding=str(Constant.ROT_13.value))
+
+
+class Exporter(object):
+    """
+    https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html
+    """
+
+    def __init__(self, credentials):
+        self.credentials = credentials
+        self.clipboard = ""
+
+    def _make_powershell(self):
+        self.clipboard = f"$Env:AWS_ACCESS_KEY_ID=\"{self.credentials['accessKeyId']}\"\n"
+        self.clipboard += f"$Env:AWS_SECRET_ACCESS_KEY=\"{self.credentials['secretAccessKey']}\"\n"
+        self.clipboard += f"$Env:AWS_SESSION_TOKEN=\"{self.credentials['sessionToken']}\""
+
+    def _make_cmd(self):
+        self.clipboard = f"set AWS_ACCESS_KEY_ID={self.credentials['accessKeyId']}\n"
+        self.clipboard += f"set AWS_SECRET_ACCESS_KEY={self.credentials['secretAccessKey']}\n"
+        self.clipboard += f"set AWS_SESSION_TOKEN={self.credentials['sessionToken']}"
+
+    def _make_nix(self):
+        self.clipboard = f"export AWS_ACCESS_KEY_ID={self.credentials['accessKeyId']}\n"
+        self.clipboard += f"export AWS_SECRET_ACCESS_KEY={self.credentials['secretAccessKey']}\n"
+        self.clipboard += f"export AWS_SESSION_TOKEN={self.credentials['sessionToken']}"
+
+    def _make_windows(self):
+        if "$P$G" in os.getenv("PROMPT", ""):
+            # cmd.exe
+            logger.debug(f"Detected Windows platform with cmd.exe")
+            self._make_cmd()
+        else:
+            # powershell
+            logger.debug(f"Detected Windows platform with PowerShell")
+            self._make_powershell()
+
+    def get_export_cmd(self):
+        if platform.system() == "Windows":
+            self._make_windows()
+        else:
+            # Unix
+            logger.debug(f"Detected Nix platform")
+            self._make_nix()
+
+        return self.clipboard
 
 
 def get_export_vars(profile_name, credentials):
@@ -113,9 +159,7 @@ def get_export_vars(profile_name, credentials):
     pyperclip_spec = importlib_util.find_spec("pyperclip")
     pyperclip_found = pyperclip_spec is not None
 
-    clipboard = f"export AWS_ACCESS_KEY_ID={credentials['accessKeyId']}\n"
-    clipboard += f"export AWS_SECRET_ACCESS_KEY={credentials['secretAccessKey']}\n"
-    clipboard += f"export AWS_SESSION_TOKEN={credentials['sessionToken']}"
+    clipboard = Exporter(credentials).get_export_cmd()
 
     if pyperclip_found:
         import pyperclip  # pragma: no cover

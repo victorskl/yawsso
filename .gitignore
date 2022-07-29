@@ -28,3 +28,6 @@ py38/
 
 cdk.out/
 cdk.context.json
+
+h.bat
+h.sh

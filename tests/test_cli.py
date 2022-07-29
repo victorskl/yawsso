@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import pathlib
 import tempfile
 import uuid
@@ -27,7 +28,7 @@ program = 'yawsso'
 class CLIUnitTests(TestCase):
 
     def setUp(self) -> None:
-        self.config = tempfile.NamedTemporaryFile()
+        self.config = tempfile.NamedTemporaryFile(delete=False)
         conf_ini = b"""
         [default]
         sso_start_url = https://petshop.awsapps.com/start
@@ -87,7 +88,7 @@ class CLIUnitTests(TestCase):
         self.config.seek(0)
         self.config.read()
 
-        self.credentials = tempfile.NamedTemporaryFile()
+        self.credentials = tempfile.NamedTemporaryFile(delete=False)
         cred_ini = b"""
         [default]
         region = ap-southeast-2
@@ -108,7 +109,7 @@ class CLIUnitTests(TestCase):
         self.credentials.read()
 
         self.sso_cache_dir = tempfile.TemporaryDirectory()
-        self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json')
+        self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json', delete=False)
         cache_json = {
             "startUrl": "https://petshop.awsapps.com/start",
             "region": "ap-southeast-2",
@@ -185,6 +186,16 @@ class CLIUnitTests(TestCase):
         self.config.close()
         self.credentials.close()
         self.sso_cache_json.close()
+
+        if os.path.exists(self.config.name):
+            os.unlink(self.config.name)
+
+        if os.path.exists(self.credentials.name):
+            os.unlink(self.credentials.name)
+
+        if os.path.exists(self.sso_cache_json.name):
+            os.unlink(self.sso_cache_json.name)
+
         self.sso_cache_dir.cleanup()
         cli.core.aws_bin = "aws"
         unstub()
@@ -221,8 +232,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-t'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [profile dev]
             region = ap-southeast-2
@@ -267,9 +279,10 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_credential_not_found
         """
-        tmp_file = tempfile.NamedTemporaryFile()
+        tmp_file = tempfile.NamedTemporaryFile(delete=False)
         tmp_name = tmp_file.name
         tmp_file.close()
+        os.unlink(tmp_file.name)
         with ArgvContext(program, '-d', '-p', 'dev'):
             cli.core.aws_shared_credentials_file = tmp_name
             cli.main()
@@ -303,10 +316,11 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.sso_cache_json.close()
+            os.unlink(self.sso_cache_json.name)
             self.sso_cache_dir.cleanup()
             # start new test case
             self.sso_cache_dir = tempfile.TemporaryDirectory()
-            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json')
+            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json', delete=False)
             cache_json = {
                 "startUrl": "https://petshop.awsapps.com/start",
                 "region": "ap-southeast-2",
@@ -337,8 +351,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '--default-only', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             region = ap-southeast-2
@@ -358,8 +373,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '--default', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [profile default]
             region = ap-southeast-2
@@ -379,10 +395,11 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.sso_cache_json.close()
+            os.unlink(self.sso_cache_json.name)
             self.sso_cache_dir.cleanup()
             # start new test case
             self.sso_cache_dir = tempfile.TemporaryDirectory()
-            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.txt')
+            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.txt', delete=False)
             self.sso_cache_json.seek(0)
             self.sso_cache_json.read()
             cli.core.aws_sso_cache_path = self.sso_cache_dir.name
@@ -396,8 +413,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [profile dev]
             sso_start_url = https://vetclinic.awsapps.com/start
@@ -421,8 +439,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-p', 'dev', '-t'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [profile dev]
             sso_start_url = https://petshop.awsapps.com/start
@@ -451,10 +470,11 @@ class CLIUnitTests(TestCase):
         """
         # clean up as going to mutate this
         self.sso_cache_json.close()
+        os.unlink(self.sso_cache_json.name)
         self.sso_cache_dir.cleanup()
         # start new test case
         self.sso_cache_dir = tempfile.TemporaryDirectory()
-        self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json')
+        self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json', delete=False)
         self.sso_cache_json.write('{}{}'.encode('utf-8'))
         self.sso_cache_json.seek(0)
         self.sso_cache_json.read()
@@ -486,8 +506,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-t'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             sso_start_url = https://petshop.awsapps.com/start
@@ -521,8 +542,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-t', '-p', 'dev'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             sso_start_url = https://petshop.awsapps.com/start
@@ -554,7 +576,8 @@ class CLIUnitTests(TestCase):
         """
         with ArgvContext(program, '-t', '-p', 'dev'):
             self.credentials.close()
-            self.credentials = tempfile.NamedTemporaryFile()
+            os.unlink(self.credentials.name)
+            self.credentials = tempfile.NamedTemporaryFile(delete=False)
             cred_ini = b"""
             [default]
             region = ap-southeast-2
@@ -569,8 +592,9 @@ class CLIUnitTests(TestCase):
             cli.core.aws_shared_credentials_file = self.credentials.name
 
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             sso_start_url = https://petshop.awsapps.com/start
@@ -611,8 +635,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-t'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             region = ap-southeast-2
@@ -665,8 +690,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-e', '-t'), self.assertRaises(SystemExit) as x:
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             sso_start_url = https://petshop.awsapps.com/start
@@ -691,8 +717,9 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, '-e', '--default', '-t'):
             # clean up as going to mutate this
             self.config.close()
+            os.unlink(self.config.name)
             # now start new test case
-            self.config = tempfile.NamedTemporaryFile()
+            self.config = tempfile.NamedTemporaryFile(delete=False)
             conf_ini = b"""
             [default]
             sso_start_url = https://petshop.awsapps.com/start

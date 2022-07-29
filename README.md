@@ -223,14 +223,17 @@ yawsso login --profile dev -e | yawsso decrypt
 `yawsso` can encrypt and decrypt some arbitrary string from `stdin` using [ROT13](https://en.wikipedia.org/wiki/ROT13) (_a simple letter substitution cipher_) as follows.
 
 ```
-yawsso encrypt <<< 'Hello this is a test'
+echo 'Hello this is a test' | yawsso encrypt
 Uryyb guvf vf n grfg
 
-yawsso decrypt <<< 'Uryyb guvf vf n grfg'
+echo 'Uryyb guvf vf n grfg' | yawsso decrypt
 Hello this is a test
 
 (or Pipe through some text corpus)
-cat test.txt | yawsso encrypt 
+cat test.txt | yawsso encrypt
+
+(or on Windows)
+type test.txt | yawsso encrypt
 ```
 
 This is the same as using trivial Unix `tr` command as follows.
@@ -256,6 +259,16 @@ yawsso -p dev -e | tr 'A-Za-z' 'N-ZA-Mn-za-m'
 ```
 make install
 make test
+python -m yawsso --trace version
+```
+
+(Windows)
+
+```
+python -m venv venv
+.\venv\Scripts\activate
+pip install ".[dev,test]" .
+pytest
 python -m yawsso --trace version
 ```
 
