@@ -75,7 +75,7 @@ def parse_credentials_file_session_expiry(dt_str):
 
 def parse_role_name_from_role_arn(role_arn):
     arr = role_arn.split('/')
-    return arr[len(arr) - 1]
+    return str(arr[len(arr) - 1]).replace('"', '').replace("'", "")
 
 
 def append_cli_global_options(cmd: str, profile: dict):
