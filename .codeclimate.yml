@@ -1,0 +1,4 @@
+exclude_patterns:
+- "h.py"
+- "cdk.py"
+- "tests/*"
