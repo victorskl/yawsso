@@ -62,6 +62,18 @@ def parser():
     ap.add_argument("-v", "--version", help="Print version and exit", action="store_true")
 
     sp = ap.add_subparsers(title="available commands", metavar="", dest="command")
+
+    parser_login(sp)
+    parser_auto(sp)
+
+    sp.add_parser("encrypt", help=f"Encrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
+    sp.add_parser("decrypt", help=f"Decrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
+    sp.add_parser("version", help="Print version and exit")
+
+    return ap
+
+
+def parser_login(sp):
     login_help = "Invoke aws sso login and sync all named profiles"
     login_description = f"{login_help}\nUse `default` profile or `AWS_PROFILE` if optional argument `--profile` absent"
     login_command = sp.add_parser(
@@ -70,11 +82,17 @@ def parser():
     login_command.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
     login_command.add_argument("--profile", help="Login profile (use `default` or `AWS_PROFILE` if absent)", metavar="")
     login_command.add_argument("--this", action="store_true", help="Only sync this login profile")
-    sp.add_parser("encrypt", help=f"Encrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
-    sp.add_parser("decrypt", help=f"Decrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
-    sp.add_parser("version", help="Print version and exit")
 
-    return ap
+
+def parser_auto(sp):
+    auto_help = "Auto invoke login upon session expiration and sync all"
+    auto_description = f"{auto_help}\nUse `default` profile or `AWS_PROFILE` if optional argument `--profile` absent"
+    auto_command = sp.add_parser(
+        "auto", description=auto_description, help=auto_help, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    auto_command.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
+    auto_command.add_argument("--profile", help="Login profile (use `default` or `AWS_PROFILE` if absent)", metavar="")
+    auto_command.add_argument("--this", action="store_true", help="Only sync this auto login profile")
 
 
 def verify_files_exist():

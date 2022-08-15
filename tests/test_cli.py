@@ -5,10 +5,8 @@ import pathlib
 import tempfile
 import uuid
 from datetime import datetime, timedelta
-from io import StringIO
 from random import randint
 from unittest import TestCase
-from unittest.mock import patch
 
 from cli_test_helpers import ArgvContext
 from mockito import unstub, when, contains, verify, mock
@@ -909,26 +907,6 @@ class CLIUnitTests(TestCase):
         with ArgvContext(program, uuid.uuid4().hex), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 2)
-
-    @patch("sys.stdin", StringIO("Hello\n"))
-    def test_encrypt_command(self):
-        """
-        python -m unittest tests.test_cli.CLIUnitTests.test_encrypt_command
-        """
-        unstub()
-        with ArgvContext(program, 'encrypt'), self.assertRaises(SystemExit) as x:
-            cli.main()
-        self.assertEqual(x.exception.code, 0)
-
-    @patch("sys.stdin", StringIO("Uryyb\n"))
-    def test_decrypt_command(self):
-        """
-        python -m unittest tests.test_cli.CLIUnitTests.test_decrypt_command
-        """
-        unstub()
-        with ArgvContext(program, 'decrypt'), self.assertRaises(SystemExit) as x:
-            cli.main()
-        self.assertEqual(x.exception.code, 0)
 
     # below are subprocess cmd call tests, better keep them at last
 

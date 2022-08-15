@@ -1,5 +1,7 @@
+import os
 import sys
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from yawsso import TRACE, Constant, logger, core, utils
 
@@ -32,6 +34,9 @@ class Command(object):
         elif self.args.command == "login":
             LoginCommand(self).perform().handle()
 
+        elif self.args.command == "auto":
+            AutoCommand(self).perform().handle()
+
 
 class CommandAction(ABC):
 
@@ -63,12 +68,12 @@ class LoginCommand(CommandAction):
 
     def __init__(self, co):
         super(LoginCommand, self).__init__(co)
-        self.login_profile = "default"
+        self.login_profile = os.getenv("AWS_PROFILE", "default")
         self.login_profile_new_name = ""
+        self.cmd_aws_sso_login = f"{core.aws_bin} sso login"
+        self._init_props()
 
-    def perform(self):
-        cmd_aws_sso_login = f"{core.aws_bin} sso login"
-
+    def _init_props(self):
         if self.co.args.profile:
             if ":" in self.co.args.profile:
                 # support rename profile upon login then sync use case
@@ -77,13 +82,14 @@ class LoginCommand(CommandAction):
             else:
                 self.login_profile = self.co.args.profile
 
-            cmd_aws_sso_login = f"{cmd_aws_sso_login} --profile={self.login_profile}"
+            self.cmd_aws_sso_login = f"{self.cmd_aws_sso_login} --profile={self.login_profile}"
 
-        logger.log(TRACE, f"Running command: `{cmd_aws_sso_login}`")
+    def perform(self):
+        logger.log(TRACE, f"Running command: `{self.cmd_aws_sso_login}`")
 
-        login_success = utils.Poll(cmd_aws_sso_login, output=not self.co.export_vars).start().resolve()
+        login_success = utils.Poll(self.cmd_aws_sso_login, output=not self.co.export_vars).start().resolve()
         if not login_success:
-            utils.halt(f"Error running command: `{cmd_aws_sso_login}`")
+            utils.halt(f"Error running command: `{self.cmd_aws_sso_login}`")
 
         return self
 
@@ -111,3 +117,44 @@ class LoginCommand(CommandAction):
     def _handle_flag_default(self):
         if self.login_profile == "default" and not self.co.export_vars:
             core.update_profile("default", self.co.config, self.login_profile_new_name)
+
+
+class AutoCommand(LoginCommand):
+
+    def __init__(self, co):
+        super(AutoCommand, self).__init__(co)
+
+    def get_sso_cached_login(self, profile):
+        cached_login = core.get_aws_cli_v2_sso_cached_login(profile)
+
+        if cached_login is None:
+            utils.halt(f"Can not find valid AWS CLI v2 SSO login cache in {core.aws_sso_cache_path} "
+                       f"for profile {self.login_profile}.")
+
+        return cached_login
+
+    def is_sso_cached_login_expired(self, cached_login):
+        expires_utc = core.parse_sso_cached_login_expiry(cached_login)
+
+        if datetime.utcnow() > expires_utc:
+            logger.log(TRACE, f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. "
+                              f"Performing auto login for profile {self.login_profile}.")
+            return True
+
+        return False
+
+    def perform(self):
+        profile = core.load_profile_from_config(self.login_profile, self.co.config)
+
+        if not core.is_sso_profile(profile):
+            utils.halt(f"Login profile is not an AWS SSO profile. Abort auto syncing profile `{self.login_profile}`")
+
+        cached_login = self.get_sso_cached_login(profile)
+
+        if self.is_sso_cached_login_expired(cached_login=cached_login):
+            super(AutoCommand, self).perform()
+
+        return self
+
+    def handle(self):
+        super(AutoCommand, self).handle()

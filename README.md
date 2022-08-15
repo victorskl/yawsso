@@ -218,6 +218,22 @@ yawsso login -e | yawsso decrypt
 yawsso login --profile dev -e | yawsso decrypt
 ```
 
+### Auto Login then Sync
+
+- Like `login`, you may use `yawsso` subcommand `auto` to SSO login then sync all in one go.
+- It will check if SSO session has expired and, if so, `yawsso` will attempt to auto login again.
+
+```
+yawsso auto -h
+
+(either)
+yawsso auto --profile dev
+
+(or)
+export AWS_PROFILE=dev
+yawsso auto
+```
+
 ### Encryption
 
 `yawsso` can encrypt and decrypt some arbitrary string from `stdin` using [ROT13](https://en.wikipedia.org/wiki/ROT13) (_a simple letter substitution cipher_) as follows.
