@@ -789,7 +789,7 @@ class CLIUnitTests(TestCase):
         """
         when(cli.utils).invoke(contains('aws sts assume-role')).thenReturn((False, "does-not-matter"))
         when(cli.utils).invoke(contains('aws iam get-role')).thenReturn((True, '{"Role": {"MaxSessionDuration": 3600}}'))
-        p = {'role_arn': 'arn:aws:iam::1234567890:role/FullAdmin', 'region': 'us-east-1'}
+        p = {'role_arn': 'arn:aws:iam::1234567890:role/FullAdmin', 'region': 'us-east-1', 'source_profile': 'default'}
         cred = cli.core.fetch_credentials_with_assume_role("default", p)
         self.assertIsNone(cred)
 
