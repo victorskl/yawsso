@@ -156,7 +156,7 @@ def fetch_credentials_with_assume_role(profile_name, profile):
     utc_now_ts = int(datetime.utcnow().replace(tzinfo=timezone.utc).timestamp())
     cmd_assume_role_cred = f"{aws_bin} sts assume-role " \
                            f"--output json " \
-                           f"--profile {profile_name} " \
+                           f"--profile {profile['source_profile']} " \
                            f"--role-arn {profile['role_arn']} " \
                            f"--role-session-name yawsso-session-{utc_now_ts} " \
                            f"--duration-seconds {duration_seconds} " \
