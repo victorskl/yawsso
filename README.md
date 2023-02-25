@@ -7,8 +7,6 @@
 [![coveralls.io](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=main)](https://coveralls.io/github/victorskl/yawsso?branch=main)
 [![codeclimate - Test Coverage](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/test_coverage)](https://codeclimate.com/github/victorskl/yawsso/test_coverage)
 [![codeclimate - Maintainability](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/maintainability)](https://codeclimate.com/github/victorskl/yawsso/maintainability)
-[![lgtm - Language grade: Python](https://img.shields.io/lgtm/grade/python/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/context:python) 
-[![lgtm - Total alerts](https://img.shields.io/lgtm/alerts/g/victorskl/yawsso.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/victorskl/yawsso/alerts/) 
 [![snyk](https://snyk.io/advisor/python/yawsso/badge.svg)](https://snyk.io/advisor/python/yawsso) 
 [![kandi](https://img.shields.io/badge/kandi-X--Ray%20Report-ff69b4)](https://kandi.openweaver.com/python/victorskl/yawsso) 
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/yawsso?style=flat)](https://pypistats.org/packages/yawsso) 
@@ -94,6 +92,7 @@ yawsso -h
     - `awsbw -L -P dev`
     - `sqsmover -s main-dlq -d main-queue`
     - `ecs-cli ps --cluster my-cluster`
+    - `awscurl -H "Accept: application/json" --profile dev --region ap-southeast-2 "https://api..."`
 
 ## Additional Use Cases
 

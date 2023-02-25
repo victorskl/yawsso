@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.6', '3.7', '3.8', '3.9', '3.10' ]
+        python-version: [ '3.6', '3.7', '3.8', '3.9', '3.10', '3.11' ]
 
     steps:
       - name: Checkout code
@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.4.3
+        uses: trufflesecurity/trufflehog@v3.28.0
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -64,14 +64,14 @@ jobs:
           xvfb-run pytest --cov-report xml --cov=yawsso tests/
 
       - name: Publish coverage to to Codecov
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
           flags: unittests
           name: yawsso
 
       - name: Publish coverage to CodeClimate
-        uses: paambaati/codeclimate-action@v3.0.0
+        uses: paambaati/codeclimate-action@v3.2.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:

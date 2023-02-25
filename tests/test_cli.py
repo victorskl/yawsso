@@ -817,6 +817,7 @@ class CLIUnitTests(TestCase):
         when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
         when(mock_poll).start(...).thenReturn(mock_poll)
         when(mock_poll).resolve(...).thenReturn(True)
+        when(os).getenv(...).thenReturn('default')
         with ArgvContext(program, '-t', 'login'):
             cli.main()
         cred = cli.utils.read_config(self.credentials.name)
@@ -866,6 +867,7 @@ class CLIUnitTests(TestCase):
         when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
         when(mock_poll).start(...).thenReturn(mock_poll)
         when(mock_poll).resolve(...).thenReturn(True)
+        when(os).getenv(...).thenReturn('default')
         with ArgvContext(program, '-t', 'login', '-e'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
@@ -883,6 +885,7 @@ class CLIUnitTests(TestCase):
         when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
         when(mock_poll).start(...).thenReturn(mock_poll)
         when(mock_poll).resolve(...).thenReturn(True)
+        when(os).getenv(...).thenReturn('default')
         with ArgvContext(program, '-t', '-e', 'login'), self.assertRaises(SystemExit) as x:
             cli.main()
         self.assertEqual(x.exception.code, 0)
