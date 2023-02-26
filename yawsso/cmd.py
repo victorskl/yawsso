@@ -11,8 +11,17 @@ class Command(object):
     def __init__(self, args):
         self.args = args
         self.config = utils.read_config(core.aws_config_file)
+        self._drop_sso_session_sections_from_config()
         self.profiles_new_name = dict()
         self.export_vars = self._build_export_vars()
+
+    def _drop_sso_session_sections_from_config(self):
+        sso_sessions = []
+        for s in self.config.sections():
+            if s.startswith("sso-session"):
+                sso_sessions.append(s)
+        for entry in sso_sessions:
+            self.config.remove_section(entry)
 
     def _build_export_vars(self):
         """Make export_vars avail either side of subcommand"""

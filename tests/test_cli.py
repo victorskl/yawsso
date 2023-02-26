@@ -28,6 +28,19 @@ class CLIUnitTests(TestCase):
     def setUp(self) -> None:
         self.config = tempfile.NamedTemporaryFile(delete=False)
         conf_ini = b"""
+        [sso-session petshop]
+        sso_start_url = https://petshop.awsapps.com/start
+        sso_region = ap-southeast-2
+        sso_registration_scopes = sso:account:access
+        
+        [profile dev2]
+        sso_session = petshop
+        sso_account_id = 123456789123
+        sso_role_name = AdministratorAccess
+        region = ap-southeast-2
+        output = json
+        cli_pager =
+        
         [default]
         sso_start_url = https://petshop.awsapps.com/start
         sso_region = ap-southeast-2
@@ -80,7 +93,7 @@ class CLIUnitTests(TestCase):
         sso_role_name = AdministratorAccess
         region = ap-southeast-2
         output = json
-        ca_bundle = dev/apps/ca-certs/cabundle-2019mar05.pem        
+        ca_bundle = dev/apps/ca-certs/cabundle-2019mar05.pem
         """
         self.config.write(conf_ini)
         self.config.seek(0)
@@ -209,6 +222,45 @@ class CLIUnitTests(TestCase):
             self.assertNotEqual(new_tok, 'tok')
             self.assertEqual(new_tok, 'VeryLongBase664String==')
             verify(cli.utils, times=2).invoke(...)
+
+    def test_sso_session_config(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_sso_session_config
+        """
+        with ArgvContext(program, '-p', 'dev2', '--debug'):
+            cli.main()
+            cred = cli.utils.read_config(self.credentials.name)
+            new_tok = cred['dev2']['aws_session_token']
+            self.assertNotEqual(new_tok, 'tok')
+            self.assertEqual(new_tok, 'VeryLongBase664String==')
+            verify(cli.utils, times=2).invoke(...)
+
+    def test_sso_session_config_no_section(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_sso_session_config_no_section
+        """
+        with ArgvContext(program, '-p', 'dev2', '-t'), self.assertRaises(SystemExit) as x:
+            # clean up as going to mutate this
+            self.config.close()
+            os.unlink(self.config.name)
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile(delete=False)
+            conf_ini = b"""
+            [profile dev2]
+            sso_session = petshop
+            sso_account_id = 123456789123
+            sso_role_name = AdministratorAccess
+            region = ap-southeast-2
+            output = json
+            cli_pager =
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.core.aws_config_file = self.config.name
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+        verify(cli.utils, times=1).invoke(...)
 
     def test_profile_prefix(self):
         """

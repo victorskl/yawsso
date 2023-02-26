@@ -209,7 +209,23 @@ def load_profile_from_config(profile_name, config):
 
 
 def is_sso_profile(profile):
+    return is_sso_legacy_profile(profile) or is_sso_session_profile(profile)
+
+
+def is_sso_legacy_profile(profile):
     return {"sso_start_url", "sso_account_id", "sso_role_name", "sso_region"} <= profile.keys()
+
+
+def is_sso_session_profile(profile):
+    is_sso_session = {"sso_session", "sso_account_id", "sso_role_name"} <= profile.keys()
+    if is_sso_session:
+        try:
+            config = u.read_config(aws_config_file)
+            sso_session_config = dict(config.items(f"sso-session {profile['sso_session']}"))
+            profile.update(sso_session_config)  # merge profile with sso-session section
+        except NoSectionError as e:
+            u.halt(e)
+    return is_sso_session
 
 
 def is_source_profile(profile):
