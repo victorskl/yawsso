@@ -20,7 +20,7 @@ Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 cred
 
 ## Prerequisite
 
-- Required `Python >= 3.6`
+- Required `Python >= 3.7`
 - Required [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
 - Assume you have already setup [AWS SSO](https://aws.amazon.com/single-sign-on/) for your organization
 
