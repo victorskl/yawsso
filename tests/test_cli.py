@@ -510,8 +510,8 @@ class CLIUnitTests(TestCase):
         cred = cli.utils.read_config(self.credentials.name)
         tok_now = cred['dev']['aws_session_token']
         self.assertEqual(tok_now, 'VeryLongBase664String==')  # assert cred updated
-        self.assertEqual(cred['dev']['region'], 'us-east-2')  # assert cred region is same as config region
-        self.assertEqual(sso_cache['region'], 'ap-southeast-2')  # assert sso cache is in another region PR#61
+        # self.assertEqual(cred['dev']['region'], 'us-east-2')  # assert cred region is same as config region issue#76
+        self.assertEqual(sso_cache['region'], 'ap-southeast-2')  # assert sso cache is in another region pr#61
         verify(cli.utils, times=2).invoke(...)
 
     def test_load_json_value_error(self):

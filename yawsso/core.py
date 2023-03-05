@@ -35,12 +35,12 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
                        f"Skip syncing it. Use --trace flag to see possible error causes.")
         return
 
-    region = profile.get("region", aws_default_region)
+    # region = profile.get("region", aws_default_region)
     config = u.read_config(aws_shared_credentials_file)
     if config.has_section(profile_name):
         config.remove_section(profile_name)
     config.add_section(profile_name)
-    config.set(profile_name, "region", region)
+    # config.set(profile_name, "region", region)  # See https://github.com/victorskl/yawsso/issues/76
     config.set(profile_name, "aws_access_key_id", credentials["accessKeyId"])
     config.set(profile_name, "aws_secret_access_key", credentials["secretAccessKey"])
     config.set(profile_name, "aws_session_token", credentials["sessionToken"])
