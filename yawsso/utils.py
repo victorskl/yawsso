@@ -130,7 +130,11 @@ class Exporter(object):
         self.clipboard += f"export AWS_SESSION_TOKEN={self.credentials['sessionToken']}"
 
     def _make_windows(self):
-        if "$P$G" in os.getenv("PROMPT", ""):
+        if os.getenv("SHELL", None):
+            # bash.exe MINGW64 Git Bash
+            logger.debug(f"Detected Windows platform with {os.getenv('SHELL')}")
+            self._make_nix()
+        elif "$P$G" in os.getenv("PROMPT", ""):
             # cmd.exe
             logger.debug(f"Detected Windows platform with cmd.exe")
             self._make_cmd()
