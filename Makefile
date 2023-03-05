@@ -40,7 +40,7 @@ tf:
 smoke:
 	@terraform plan
 	@cdk synth --app "python cdk.py" --profile dev
-	@cw ls -p dev groups
+	@cw ls groups
 
 .PHONY: doc
 doc:

@@ -88,7 +88,7 @@ yawsso -h
 - Then, continue per normal with your daily tools. i.e. 
     - `cdk deploy ...`
     - `terraform apply ...`
-    - `cw ls -p dev groups`
+    - `cw ls groups`
     - `awsbw -L -P dev`
     - `sqsmover -s main-dlq -d main-queue`
     - `ecs-cli ps --cluster my-cluster`

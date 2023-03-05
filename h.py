@@ -22,4 +22,4 @@ if __name__ == '__main__':
 
 # Usage:
 #   python h.py > h.bat
-#   h
+#   h  (OR)  sh h.bat
