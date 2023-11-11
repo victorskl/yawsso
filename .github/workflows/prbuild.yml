@@ -30,12 +30,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.28.0
+        uses: trufflesecurity/trufflehog@v3.62.1
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -71,7 +71,7 @@ jobs:
           name: yawsso
 
       - name: Publish coverage to CodeClimate
-        uses: paambaati/codeclimate-action@v3.2.0
+        uses: paambaati/codeclimate-action@v5.0.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:

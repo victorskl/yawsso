@@ -23,6 +23,7 @@ py38/
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfstate.*
 
 .DS_Store
 

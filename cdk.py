@@ -35,5 +35,5 @@ if __name__ == '__main__':
 # Usage:
 #   aws sso login --profile dev
 #   yawsso -p dev
-#   cdk synth --app "python cdk.py" --profile dev
-#   cdk context -j | jq
+#   npx cdk synth --app "python cdk.py" --profile dev
+#   npx cdk context -j | jq

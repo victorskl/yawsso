@@ -1,5 +1,6 @@
 install:
 	@pip install ".[dev,test]" .
+	@pnpm install
 	@pre-commit install
 
 check:
@@ -39,7 +40,7 @@ tf:
 
 smoke:
 	@terraform plan
-	@cdk synth --app "python cdk.py" --profile dev
+	@npx cdk synth --app "python cdk.py" --profile dev
 	@cw ls groups
 
 .PHONY: doc

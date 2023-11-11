@@ -6,7 +6,7 @@ repos:
       - id: detect-secrets
         name: detect secrets
         args: [ '--baseline', '.secrets.baseline' ]
-        exclude: yarn.lock
+        exclude: ^(yarn.lock|.yarn/|pnpm-lock.yaml)
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
