@@ -31,8 +31,7 @@ def get_aws_cli_v2_sso_cached_login(profile):
 
 def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     if credentials is None:
-        logger.warning(f"No appropriate credentials found for profile '{profile_name}'. "
-                       f"Skip syncing it. Use --trace flag to see possible error causes.")
+        logger.warning(f"No appropriate credentials found. Skip syncing profile `{profile_name}`")
         return
 
     # region = profile.get("region", aws_default_region)
@@ -51,14 +50,6 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
     u.write_config(aws_shared_credentials_file, config)
 
     logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
-
-
-def parse_sso_cached_login_expiry(cached_login):
-    # older versions of aws-cli might use non-standard format with `UTC` instead of `Z`
-    expires_at = cached_login["expiresAt"].replace('UTC', 'Z')
-    datetime_format_in_sso_cached_login = "%Y-%m-%dT%H:%M:%SZ"
-    expires_utc = datetime.strptime(expires_at, datetime_format_in_sso_cached_login)
-    return expires_utc
 
 
 def parse_assume_role_credentials_expiry(dt_str):
@@ -82,41 +73,73 @@ def append_cli_global_options(cmd: str, profile: dict):
     ca_bundle = profile.get('ca_bundle', None)
     if ca_bundle:
         cmd = f"{cmd} --ca-bundle '{ca_bundle}'"
-
-    logger.log(TRACE, f"COMMAND: {cmd}")
     return cmd
 
 
-def check_sso_cached_login_expires(profile_name, profile):
-    cached_login = get_aws_cli_v2_sso_cached_login(profile)
-    if cached_login is None:
-        u.halt(f"Can not find valid AWS CLI v2 SSO login cache in {aws_sso_cache_path} for profile {profile_name}.")
+def create_access_token(cached_login):
+    cmd_create_token = f"{aws_bin} sso-oidc create-token " \
+                       f"--output json " \
+                       f"--client-id {cached_login['clientId']} " \
+                       f"--client-secret {cached_login['clientSecret']} " \
+                       f"--grant-type refresh_token " \
+                       f"--refresh-token {cached_login['refreshToken']}"
 
-    expires_utc = parse_sso_cached_login_expiry(cached_login)
+    create_token_success, create_token_output = u.invoke(cmd_create_token)
 
-    if datetime.utcnow() > expires_utc:
-        u.halt(f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. Try login again.")
+    if not create_token_success:
+        logger.log(TRACE, f"EXCEPTION: '{create_token_output}'")
 
-    return cached_login
+    return create_token_success, create_token_output
 
 
-def fetch_credentials(profile_name, profile):
-    cached_login = check_sso_cached_login_expires(profile_name, profile)
-
+def get_role_credentials(profile_name, profile, access_token):
     cmd_get_role_cred = f"{aws_bin} sso get-role-credentials " \
                         f"--output json " \
                         f"--profile {profile_name} " \
                         f"--region {profile['sso_region']} " \
                         f"--role-name {profile['sso_role_name']} " \
                         f"--account-id {profile['sso_account_id']} " \
-                        f"--access-token {cached_login['accessToken']}"
+                        f"--access-token {access_token}"
 
     cmd_get_role_cred = append_cli_global_options(cmd_get_role_cred, profile)
 
     role_cred_success, role_cred_output = u.invoke(cmd_get_role_cred)
 
     if not role_cred_success:
-        logger.log(TRACE, f"ERROR EXECUTING COMMAND: '{cmd_get_role_cred}'. EXCEPTION: '{role_cred_output}'")
+        logger.log(TRACE, f"EXCEPTION: '{role_cred_output}'")
+
+    return role_cred_success, role_cred_output
+
+
+def session_cached(profile_name, profile, cached_login):
+    return get_role_credentials(profile_name, profile, cached_login['accessToken'])
+
+
+def session_refresh(profile_name, profile, cached_login):
+    logger.log(TRACE, f"Attempt using SSO refreshToken to generate accessToken")
+    create_token_success, create_token_output = create_access_token(cached_login)
+    if create_token_success:
+        return get_role_credentials(profile_name, profile, json.loads(create_token_output)['accessToken'])
+    return False, create_token_output
+
+
+def fetch_credentials(profile_name, profile):
+    cached_login = get_aws_cli_v2_sso_cached_login(profile)
+    if cached_login is None:
+        logger.warning(f"Can not find SSO login session cache in {aws_sso_cache_path} "
+                       f"for ({profile['sso_start_url']}) profile `{profile_name}`.")
+        return
+
+    # try 1: attempt using cached accessToken
+    role_cred_success, role_cred_output = session_cached(profile_name, profile, cached_login)
+
+    # try 2: attempt using refreshToken to generate accessToken
+    if not role_cred_success:
+        role_cred_success, role_cred_output = session_refresh(profile_name, profile, cached_login)
+
+    # try 3: attempt aws sso login
+    if not role_cred_success:
+        logger.warning(f"Your SSO login session ({profile['sso_start_url']}) has expired. Try aws sso login again.")
         return
 
     return json.loads(role_cred_output)['roleCredentials']
@@ -250,7 +273,6 @@ def update_profile(profile_name, config, new_profile_name=""):
         if not is_sso_profile(source_profile):
             logger.warning(f"Your source_profile is not an AWS SSO profile. Skip syncing profile `{profile_name}`")
             return
-        check_sso_cached_login_expires(source_profile_name, source_profile)
         eager_sync_source_profile(source_profile_name, source_profile)
         logger.log(TRACE, f"Fetching credentials using assume role for `{profile_name}`")
         credentials = fetch_credentials_with_assume_role(profile_name, profile)

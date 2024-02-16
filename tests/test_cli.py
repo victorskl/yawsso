@@ -125,7 +125,10 @@ class CLIUnitTests(TestCase):
             "startUrl": "https://petshop.awsapps.com/start",
             "region": "ap-southeast-2",
             "accessToken": "longTextA.AverylOngText",
-            "expiresAt": f"{str((datetime.utcnow() + timedelta(hours=3)).isoformat())[:-7]}UTC"
+            "expiresAt": f"{str((datetime.utcnow() + timedelta(hours=3)).isoformat())[:-7]}UTC",
+            "clientId": "longTextA",
+            "clientSecret": "longTextA",  # pragma: allowlist secret
+            "refreshToken": "longTextA"   # pragma: allowlist secret
         }
         self.sso_cache_json.write(json.dumps(cache_json).encode('utf-8'))
         self.sso_cache_json.seek(0)
@@ -359,31 +362,6 @@ class CLIUnitTests(TestCase):
             cli.main()
         self.assertEqual(x.exception.code, 1)
 
-    def test_sso_cache_expires(self):
-        """
-        python -m unittest tests.test_cli.CLIUnitTests.test_sso_cache_expires
-        """
-        with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
-            # clean up as going to mutate this
-            self.sso_cache_json.close()
-            os.unlink(self.sso_cache_json.name)
-            self.sso_cache_dir.cleanup()
-            # start new test case
-            self.sso_cache_dir = tempfile.TemporaryDirectory()
-            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json', delete=False)
-            cache_json = {
-                "startUrl": "https://petshop.awsapps.com/start",
-                "region": "ap-southeast-2",
-                "accessToken": "longTextA.AverylOngText",
-                "expiresAt": f"{str((datetime.utcnow()).isoformat())[:-7]}UTC"
-            }
-            self.sso_cache_json.write(json.dumps(cache_json).encode('utf-8'))
-            self.sso_cache_json.seek(0)
-            self.sso_cache_json.read()
-            cli.core.aws_sso_cache_path = self.sso_cache_dir.name
-            cli.main()
-        self.assertEqual(x.exception.code, 1)
-
     def test_aws_cli_v1(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_aws_cli_v1
@@ -442,7 +420,7 @@ class CLIUnitTests(TestCase):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_sso_cache_not_json
         """
-        with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '-p', 'dev', '-t'):
             # clean up as going to mutate this
             self.sso_cache_json.close()
             os.unlink(self.sso_cache_json.name)
@@ -454,13 +432,12 @@ class CLIUnitTests(TestCase):
             self.sso_cache_json.read()
             cli.core.aws_sso_cache_path = self.sso_cache_dir.name
             cli.main()
-        self.assertEqual(x.exception.code, 1)
 
     def test_not_equal_sso_start_url(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_not_equal_sso_start_url
         """
-        with ArgvContext(program, '-p', 'dev', '-t'), self.assertRaises(SystemExit) as x:
+        with ArgvContext(program, '-p', 'dev', '-t'):
             # clean up as going to mutate this
             self.config.close()
             os.unlink(self.config.name)
@@ -480,7 +457,6 @@ class CLIUnitTests(TestCase):
             self.config.read()
             cli.core.aws_config_file = self.config.name
             cli.main()
-        self.assertEqual(x.exception.code, 1)
 
     def test_not_equal_sso_region(self):
         """
@@ -537,6 +513,7 @@ class CLIUnitTests(TestCase):
         python -m unittest tests.test_cli.CLIUnitTests.test_sso_get_role_credentials_fail
         """
         when(cli.utils).invoke(contains('aws sso get-role-credentials')).thenReturn((False, 'does-not-matter'))
+        when(cli.utils).invoke(contains('aws sso-oidc create-token')).thenReturn((False, 'does-not-matter'))
         cred = cli.core.update_profile("dev", cli.utils.read_config(self.config.name))
         self.assertIsNone(cred)
 

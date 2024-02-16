@@ -1,6 +1,6 @@
+import json
 import os
 import tempfile
-from datetime import datetime
 from io import StringIO
 from unittest.mock import patch
 
@@ -64,9 +64,8 @@ class AutoCommandUnitTests(CLIUnitTests):
         when(mock_poll).start(...).thenReturn(mock_poll)
         when(mock_poll).resolve(...).thenReturn(True)
 
-        when(cli.cmd.AutoCommand).get_sso_cached_login(...).thenReturn({
-            'expiresAt': f"{str((datetime.utcnow()).isoformat())[:-7]}UTC"
-        })
+        when(cli.cmd.AutoCommand).session_cached(...).thenReturn((False, 'does-not-matter'))
+        when(cli.cmd.AutoCommand).session_refresh(...).thenReturn((False, 'does-not-matter'))
 
         with ArgvContext(program, '-t', 'auto', '--profile', 'dev'):
             cli.main()
@@ -75,6 +74,25 @@ class AutoCommandUnitTests(CLIUnitTests):
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
         verify(cli.utils, times=1).Poll(...)
+
+    def test_auto_command_login_expires2(self):
+        """
+        python -m unittest tests.test_cmd.AutoCommandUnitTests.test_auto_command_login_expires2
+        """
+        when(cli.cmd.AutoCommand).session_cached(...).thenReturn((False, 'does-not-matter'))
+        when(cli.utils).invoke(contains('aws sso-oidc create-token')).thenReturn((True, json.dumps({
+            "accessToken": "does-not-matter",
+            "tokenType": "Bearer",
+            "expiresIn": 3600,
+            "refreshToken": "does-not-matter"
+        })))
+
+        with ArgvContext(program, '-t', 'auto', '--profile', 'dev'):
+            cli.main()
+        cred = cli.utils.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
 
     def test_auto_login_not_sso_profile(self):
         """
