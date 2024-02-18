@@ -1,7 +1,6 @@
 import os
 import sys
 from abc import ABC, abstractmethod
-from datetime import datetime
 
 from yawsso import TRACE, Constant, logger, core, utils
 
@@ -133,24 +132,11 @@ class AutoCommand(LoginCommand):
     def __init__(self, co):
         super(AutoCommand, self).__init__(co)
 
-    def get_sso_cached_login(self, profile):
-        cached_login = core.get_aws_cli_v2_sso_cached_login(profile)
+    def session_cached(self, profile, cached_login):
+        return core.session_cached(self.login_profile, profile, cached_login)
 
-        if cached_login is None:
-            utils.halt(f"Can not find valid AWS CLI v2 SSO login cache in {core.aws_sso_cache_path} "
-                       f"for profile {self.login_profile}.")
-
-        return cached_login
-
-    def is_sso_cached_login_expired(self, cached_login):
-        expires_utc = core.parse_sso_cached_login_expiry(cached_login)
-
-        if datetime.utcnow() > expires_utc:
-            logger.log(TRACE, f"Current cached SSO login is expired since {expires_utc.astimezone().isoformat()}. "
-                              f"Performing auto login for profile {self.login_profile}.")
-            return True
-
-        return False
+    def session_refresh(self, profile, cached_login):
+        return core.session_refresh(self.login_profile, profile, cached_login)
 
     def perform(self):
         profile = core.load_profile_from_config(self.login_profile, self.co.config)
@@ -158,9 +144,21 @@ class AutoCommand(LoginCommand):
         if not core.is_sso_profile(profile):
             utils.halt(f"Login profile is not an AWS SSO profile. Abort auto syncing profile `{self.login_profile}`")
 
-        cached_login = self.get_sso_cached_login(profile)
+        cached_login = core.get_aws_cli_v2_sso_cached_login(profile)
+        if cached_login is None:
+            utils.halt(f"Can not find SSO login session cache in {core.aws_sso_cache_path} "
+                       f"for ({profile['sso_start_url']}) profile `{self.login_profile})`.")
 
-        if self.is_sso_cached_login_expired(cached_login=cached_login):
+        # try 1: attempt using cached accessToken
+        role_cred_success, _ = self.session_cached(profile, cached_login)
+
+        # try 2: attempt using refreshToken to generate accessToken
+        if not role_cred_success:
+            role_cred_success, _ = self.session_refresh(profile, cached_login)
+
+        # try 3: attempt aws sso login
+        if not role_cred_success:
+            logger.log(TRACE, f"Your SSO login session ({profile['sso_start_url']}) has expired. Attempt auto login...")
             super(AutoCommand, self).perform()
 
         return self
