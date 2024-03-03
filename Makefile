@@ -41,7 +41,7 @@ tf:
 smoke:
 	@terraform plan
 	@npx cdk synth --app "python cdk.py" --profile dev
-	@cw ls groups
+	@AWS_PROFILE=dev cw ls groups
 
 .PHONY: doc
 doc:
