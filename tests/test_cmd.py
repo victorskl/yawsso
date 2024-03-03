@@ -39,10 +39,20 @@ class AutoCommandUnitTests(CLIUnitTests):
         """
         python -m unittest tests.test_cmd.AutoCommandUnitTests.test_is_sso_cached_login_expired_none
         """
-        when(cli.core).get_aws_cli_v2_sso_cached_login(...).thenReturn(None)
-        with ArgvContext(program, '-t', 'auto', '--profile', 'dev'), self.assertRaises(SystemExit) as x:
+        mock_poll = mock(cli.utils.Poll)
+        when(cli.utils).Poll(contains('aws sso login'), ...).thenReturn(mock_poll)
+        when(mock_poll).start(...).thenReturn(mock_poll)
+        when(mock_poll).resolve(...).thenReturn(True)
+
+        when(cli.cmd.AutoCommand).get_aws_cli_v2_sso_cached_login(...).thenReturn(None)
+
+        with ArgvContext(program, '-t', 'auto', '--profile', 'dev'):
             cli.main()
-        self.assertEqual(x.exception.code, 1)
+        cred = cli.utils.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+        verify(cli.utils, times=1).Poll(...)
 
     def test_auto_command(self):
         """
