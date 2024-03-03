@@ -138,16 +138,24 @@ class AutoCommand(LoginCommand):
     def session_refresh(self, profile, cached_login):
         return core.session_refresh(self.login_profile, profile, cached_login)
 
+    @staticmethod
+    def get_aws_cli_v2_sso_cached_login(profile):
+        return core.get_aws_cli_v2_sso_cached_login(profile)
+
     def perform(self):
         profile = core.load_profile_from_config(self.login_profile, self.co.config)
 
         if not core.is_sso_profile(profile):
             utils.halt(f"Login profile is not an AWS SSO profile. Abort auto syncing profile `{self.login_profile}`")
 
-        cached_login = core.get_aws_cli_v2_sso_cached_login(profile)
+        cached_login = self.get_aws_cli_v2_sso_cached_login(profile)
         if cached_login is None:
-            utils.halt(f"Can not find SSO login session cache in {core.aws_sso_cache_path} "
-                       f"for ({profile['sso_start_url']}) profile `{self.login_profile})`.")
+            # The sso cache files may be cleared away by user or some process such as brew. Since we have proper
+            # SSO login profile, just try to auto login. See https://github.com/victorskl/yawsso/issues/87
+            logger.log(TRACE, f"Can not find SSO login session cache in {core.aws_sso_cache_path} "
+                              f"for {profile['sso_start_url']} profile `{self.login_profile}`.")
+            super(AutoCommand, self).perform()
+            return self
 
         # try 1: attempt using cached accessToken
         role_cred_success, _ = self.session_cached(profile, cached_login)
