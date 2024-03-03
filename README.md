@@ -234,6 +234,23 @@ export AWS_PROFILE=dev
 yawsso auto
 ```
 
+### Set Region
+
+- You can also set region from the config file to the shared credentials file
+- Do like so:
+
+```
+yawsso -r -p dev
+```
+
+```
+yawsso -r -p dev:foo
+```
+
+```
+yawsso -r auto --profile dev
+```
+
 ### Encryption
 
 `yawsso` can encrypt and decrypt some arbitrary string from `stdin` using [ROT13](https://en.wikipedia.org/wiki/ROT13) (_a simple letter substitution cipher_) as follows.

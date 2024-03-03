@@ -6,13 +6,13 @@ settings:
 
 dependencies:
   aws-cdk:
-    specifier: ^2.106.1
-    version: 2.106.1
+    specifier: ^2.131.0
+    version: 2.131.0
 
 packages:
 
-  /aws-cdk@2.106.1:
-    resolution: {integrity: sha512-RRkmXU7V6VPYGmmP/4Em+j8PQ06uecOetQVytyQISVzcYscrd+B+5ZXjFxy50Nvq0CUhOFWtDRbkQW06onmMzA==}
+  /aws-cdk@2.131.0:
+    resolution: {integrity: sha512-ji+MwGFGC88HE/EqV6/VARBp5mu3nXIDa/GYwtGycJqu6WqXhNZXWeDH0JsWaY6+BSUdpY6pr6KWpV+MDyVkDg==}
     engines: {node: '>= 14.15.0'}
     hasBin: true
     optionalDependencies:
