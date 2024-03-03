@@ -36,6 +36,9 @@ def boot():
     if args.bin:
         core.aws_bin = args.bin
 
+    if args.region:
+        core.region_flag = args.region
+
     logger.log(TRACE, f"args: {args}")
     logger.log(TRACE, f"AWS_CONFIG_FILE: {core.aws_config_file}")
     logger.log(TRACE, f"AWS_SHARED_CREDENTIALS_FILE: {core.aws_shared_credentials_file}")
@@ -60,6 +63,7 @@ def parser():
     ap.add_argument("-t", "--trace", help="Trace output", action="store_true")
     ap.add_argument("-e", "--export-vars", dest="export_vars1", help="Print out AWS ENV vars", action="store_true")
     ap.add_argument("-v", "--version", help="Print version and exit", action="store_true")
+    ap.add_argument("-r", "--region", help="Add region to credentials file", action="store_true")
 
     sp = ap.add_subparsers(title="available commands", metavar="", dest="command")
 

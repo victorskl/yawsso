@@ -1056,3 +1056,16 @@ class CLIUnitTests(TestCase):
         self.assertNotEqual(new_tok, 'tok')
         self.assertEqual(new_tok, 'VeryLongBase664String==')
         verify(cli.utils, times=1).Poll(...)
+
+    def test_region_flag(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_region_flag
+        """
+        with ArgvContext(program, '-p', 'dev', '-t', '-r'):
+            cli.main()
+            cred = cli.utils.read_config(self.credentials.name)
+            new_tok = cred['dev']['aws_session_token']
+            self.assertNotEqual(new_tok, 'tok')
+            self.assertEqual(new_tok, 'VeryLongBase664String==')
+            self.assertEqual(cred['dev']['region'], 'ap-southeast-2')
+            verify(cli.utils, times=2).invoke(...)

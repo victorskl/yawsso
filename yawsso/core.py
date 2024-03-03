@@ -11,7 +11,8 @@ profiles = None
 aws_sso_cache_path = u.xu(os.getenv("AWS_SSO_CACHE_PATH", Constant.AWS_SSO_CACHE_PATH.value))
 aws_config_file = u.xu(os.getenv("AWS_CONFIG_FILE", Constant.AWS_CONFIG_FILE.value))
 aws_shared_credentials_file = u.xu(os.getenv("AWS_SHARED_CREDENTIALS_FILE", Constant.AWS_SHARED_CREDENTIALS_FILE.value))
-aws_default_region = os.getenv("AWS_DEFAULT_REGION", Constant.AWS_DEFAULT_REGION.value)
+aws_default_region = os.getenv("AWS_DEFAULT_REGION")
+region_flag = False  # See https://github.com/victorskl/yawsso/issues/76
 
 
 def get_aws_cli_v2_sso_cached_login(profile):
@@ -34,19 +35,29 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
         logger.warning(f"No appropriate credentials found. Skip syncing profile `{profile_name}`")
         return
 
-    # region = profile.get("region", aws_default_region)
     config = u.read_config(aws_shared_credentials_file)
+
     if config.has_section(profile_name):
         config.remove_section(profile_name)
+
     config.add_section(profile_name)
-    # config.set(profile_name, "region", region)  # See https://github.com/victorskl/yawsso/issues/76
     config.set(profile_name, "aws_access_key_id", credentials["accessKeyId"])
     config.set(profile_name, "aws_secret_access_key", credentials["secretAccessKey"])
     config.set(profile_name, "aws_session_token", credentials["sessionToken"])
     config.set(profile_name, "aws_security_token", credentials["sessionToken"])
+
+    # set expiration
     ts_expires_millisecond = credentials["expiration"]
     dt_utc = str(datetime.utcfromtimestamp(ts_expires_millisecond / 1000.0).isoformat() + '+0000')
     config.set(profile_name, "aws_session_expiration", dt_utc)
+
+    # set region
+    region = profile.get("region", aws_default_region)
+    if region_flag and region:
+        # See https://github.com/victorskl/yawsso/issues/88
+        config.set(profile_name, "region", region)
+
+    # write the config out
     u.write_config(aws_shared_credentials_file, config)
 
     logger.debug(f"Done syncing AWS CLI v1 credentials using AWS CLI v2 SSO login session for profile `{profile_name}`")
