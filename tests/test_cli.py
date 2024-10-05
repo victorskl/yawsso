@@ -433,6 +433,41 @@ class CLIUnitTests(TestCase):
             cli.core.aws_sso_cache_path = self.sso_cache_dir.name
             cli.main()
 
+    def test_sso_cache_refresh_token_does_not_exist(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_sso_cache_refresh_token_does_not_exist
+        """
+        when(cli.core).session_cached(...).thenReturn((False, 'does-not-matter'))
+        with ArgvContext(program, '-p', 'dev', '-t'):
+            # clean up as going to mutate this
+            self.sso_cache_json.close()
+            os.unlink(self.sso_cache_json.name)
+            self.sso_cache_dir.cleanup()
+            # start new test case
+            self.sso_cache_dir = tempfile.TemporaryDirectory()
+            self.sso_cache_json = tempfile.NamedTemporaryFile(dir=self.sso_cache_dir.name, suffix='.json', delete=False)
+            cache_json = {
+                "startUrl": "https://petshop.awsapps.com/start",
+                "region": "ap-southeast-2",
+                "accessToken": "longTextA.AverylOngText",
+                "expiresAt": f"{str((datetime.utcnow() + timedelta(hours=3)).isoformat())[:-7]}UTC",
+                "clientId": "longTextA",
+                "clientSecret": "longTextA",  # pragma: allowlist secret
+                # Simulate 'refreshToken' does not exist in sso cache json file.
+                # See https://github.com/victorskl/yawsso/issues/97
+                # "refreshToken": "longTextA"   # pragma: allowlist secret
+            }
+            self.sso_cache_json.write(json.dumps(cache_json).encode('utf-8'))
+            self.sso_cache_json.seek(0)
+            self.sso_cache_json.read()
+            cli.core.aws_sso_cache_path = self.sso_cache_dir.name
+            cli.main()
+
+        # assert that no update is being made to the profile cred token
+        cred = cli.utils.read_config(cli.core.aws_shared_credentials_file)
+        tok_now = cred['dev']['aws_session_token']
+        self.assertEqual(tok_now, 'tok')
+
     def test_not_equal_sso_start_url(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_not_equal_sso_start_url
