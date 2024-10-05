@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 
 # versioning follow PEP440
-__version__ = VERSION = '1.2.0'  # pragma: no cover
+__version__ = VERSION = '1.2.1'  # pragma: no cover
 
 PROGRAM = 'yawsso'  # pragma: no cover
 
