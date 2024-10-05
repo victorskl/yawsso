@@ -4,7 +4,7 @@ import os
 import pathlib
 import tempfile
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from random import randint
 from unittest import TestCase
 
@@ -125,7 +125,7 @@ class CLIUnitTests(TestCase):
             "startUrl": "https://petshop.awsapps.com/start",
             "region": "ap-southeast-2",
             "accessToken": "longTextA.AverylOngText",
-            "expiresAt": f"{str((datetime.utcnow() + timedelta(hours=3)).isoformat())[:-7]}UTC",
+            "expiresAt": f"{str((datetime.now(timezone.utc) + timedelta(hours=3)).isoformat())[:-7]}UTC",
             "clientId": "longTextA",
             "clientSecret": "longTextA",  # pragma: allowlist secret
             "refreshToken": "longTextA"   # pragma: allowlist secret
@@ -144,7 +144,7 @@ class CLIUnitTests(TestCase):
                     'accessKeyId': 'does-not-matter',
                     'secretAccessKey': '',
                     'sessionToken': 'VeryLongBase664String==',
-                    'expiration': datetime.utcnow().timestamp()
+                    'expiration': datetime.now(timezone.utc).timestamp()
                 }
         }
 
@@ -450,7 +450,7 @@ class CLIUnitTests(TestCase):
                 "startUrl": "https://petshop.awsapps.com/start",
                 "region": "ap-southeast-2",
                 "accessToken": "longTextA.AverylOngText",
-                "expiresAt": f"{str((datetime.utcnow() + timedelta(hours=3)).isoformat())[:-7]}UTC",
+                "expiresAt": f"{str((datetime.now(timezone.utc) + timedelta(hours=3)).isoformat())[:-7]}UTC",
                 "clientId": "longTextA",
                 "clientSecret": "longTextA",  # pragma: allowlist secret
                 # Simulate 'refreshToken' does not exist in sso cache json file.

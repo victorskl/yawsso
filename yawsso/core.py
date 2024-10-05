@@ -48,7 +48,7 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
 
     # set expiration
     ts_expires_millisecond = credentials["expiration"]
-    dt_utc = str(datetime.utcfromtimestamp(ts_expires_millisecond / 1000.0).isoformat() + '+0000')
+    dt_utc = str(datetime.fromtimestamp(ts_expires_millisecond / 1000.0, timezone.utc).isoformat() + '+0000')
     config.set(profile_name, "aws_session_expiration", dt_utc)
 
     # set region
@@ -72,6 +72,7 @@ def parse_assume_role_credentials_expiry(dt_str):
 def parse_credentials_file_session_expiry(dt_str):
     datetime_format_in_cred_file_aws_session_expiration = "%Y-%m-%dT%H:%M:%S+0000"  # 2020-06-14T17:13:26+0000
     expires_utc = datetime.strptime(dt_str, datetime_format_in_cred_file_aws_session_expiration)
+    expires_utc = expires_utc.replace(tzinfo=timezone.utc)
     return expires_utc
 
 
@@ -190,7 +191,7 @@ def fetch_credentials_with_assume_role(profile_name, profile):
                           f"to a maximum of one hour. Well, you can always `yawsso` again when session expired!")
         duration_seconds = Constant.ROLE_CHAINING_DURATION_SECONDS.value
 
-    utc_now_ts = int(datetime.utcnow().replace(tzinfo=timezone.utc).timestamp())
+    utc_now_ts = int(datetime.now(timezone.utc).replace(tzinfo=timezone.utc).timestamp())
     cmd_assume_role_cred = f"{aws_bin} sts assume-role " \
                            f"--output json " \
                            f"--profile {profile['source_profile']} " \
@@ -228,7 +229,7 @@ def eager_sync_source_profile(source_profile_name, source_profile):
     if config.has_section(source_profile_name):
         cred_profile = dict(config.items(source_profile_name))
         session_expires_utc = parse_credentials_file_session_expiry(cred_profile['aws_session_expiration'])
-        if datetime.utcnow() > session_expires_utc:
+        if datetime.now(timezone.utc) > session_expires_utc:
             logger.log(TRACE, f"Eagerly sync source_profile `{source_profile_name}`")
             credentials = fetch_credentials(source_profile_name, source_profile)
             update_aws_cli_v1_credentials(source_profile_name, source_profile, credentials)
