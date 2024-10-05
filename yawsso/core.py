@@ -88,19 +88,22 @@ def append_cli_global_options(cmd: str, profile: dict):
 
 
 def create_access_token(cached_login):
-    cmd_create_token = f"{aws_bin} sso-oidc create-token " \
-                       f"--output json " \
-                       f"--client-id {cached_login['clientId']} " \
-                       f"--client-secret {cached_login['clientSecret']} " \
-                       f"--grant-type refresh_token " \
-                       f"--refresh-token {cached_login['refreshToken']}"
+    if not cached_login.get('refreshToken'):
+        logger.log(TRACE, "refreshToken not found in cached login.")
+        return False, ""
+    else:
+        cmd_create_token = f"{aws_bin} sso-oidc create-token " \
+                           f"--output json " \
+                           f"--client-id {cached_login['clientId']} " \
+                           f"--client-secret {cached_login['clientSecret']} " \
+                           f"--grant-type refresh_token " \
+                           f"--refresh-token {cached_login['refreshToken']}"
+        create_token_success, create_token_output = u.invoke(cmd_create_token)
 
-    create_token_success, create_token_output = u.invoke(cmd_create_token)
+        if not create_token_success:
+            logger.log(TRACE, f"EXCEPTION: '{create_token_output}'")
 
-    if not create_token_success:
-        logger.log(TRACE, f"EXCEPTION: '{create_token_output}'")
-
-    return create_token_success, create_token_output
+        return create_token_success, create_token_output
 
 
 def get_role_credentials(profile_name, profile, access_token):
