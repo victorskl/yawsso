@@ -61,9 +61,9 @@ ver: dist/yawsso-$(version).tar.gz
 	@echo $(version)
 
 testpypi: dist/yawsso-$(version).tar.gz
-	@python3 -m twine upload --repository testpypi --sign dist/yawsso-$(version).*
-	@python3 -m twine upload --repository testpypi --sign dist/yawsso-$(version)-*
+	@python3 -m twine upload --repository testpypi dist/yawsso-$(version).tar.gz
+	@python3 -m twine upload --repository testpypi dist/yawsso-$(version)-*.whl
 
 pypi: dist/yawsso-$(version).tar.gz
-	@python3 -m twine upload --sign dist/yawsso-$(version).*
-	@python3 -m twine upload --sign dist/yawsso-$(version)-*
+	@python3 -m twine upload dist/yawsso-$(version).tar.gz
+	@python3 -m twine upload dist/yawsso-$(version)-*.whl
