@@ -10,7 +10,8 @@ on:
       - main
 
 # Actions Used:
-#  https://github.com/actions/setup-python#usage
+#  https://github.com/actions/checkout
+#  https://github.com/actions/setup-python
 #  https://github.com/marketplace/actions/codecov
 #  https://github.com/marketplace/actions/code-climate-coverage-action
 #  https://docs.codeclimate.com/docs/github-actions-test-coverage
@@ -26,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11' ]
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
 
     steps:
       - name: Checkout code
@@ -35,14 +36,14 @@ jobs:
           fetch-depth: 0
 
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.62.1
+        uses: trufflesecurity/trufflehog@v3.82.6
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -64,14 +65,14 @@ jobs:
           xvfb-run pytest --cov-report xml --cov=yawsso tests/
 
       - name: Publish coverage to to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
           flags: unittests
           name: yawsso
 
       - name: Publish coverage to CodeClimate
-        uses: paambaati/codeclimate-action@v5.0.0
+        uses: paambaati/codeclimate-action@v9.0.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
