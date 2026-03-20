@@ -39,7 +39,7 @@ class Command(object):
         elif self.args.command == "decrypt":
             DecryptCommand(self).perform()
 
-        elif self.args.command == "set-default":
+        elif self.args.command in ("set-default", "sd"):
             SetDefaultCommand(self).perform()
 
         elif self.args.command == "login":

@@ -103,7 +103,7 @@ def parser_auto(sp):
 def parser_set_default(sp):
     set_default_help = "Copy a named profile's credentials to the default profile"
     set_default_command = sp.add_parser(
-        "set-default", description=set_default_help, help=set_default_help,
+        "set-default", aliases=["sd"], description=set_default_help, help=set_default_help,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     set_default_command.add_argument("profile", help="Source profile name to copy to default")
