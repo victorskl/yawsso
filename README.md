@@ -242,6 +242,11 @@ yawsso auto
 yawsso set-default dev
 ```
 
+- Or use the short alias `sd`:
+```
+yawsso sd dev
+```
+
 - This is useful when the `default` profile has no SSO configuration but your tools rely on it.
 
 ### Set Region
