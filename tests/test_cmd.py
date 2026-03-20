@@ -10,6 +10,34 @@ from mockito import when, unstub, mock, contains, verify
 from tests.test_cli import CLIUnitTests, program, cli
 
 
+class SetDefaultCommandUnitTests(CLIUnitTests):
+
+    def test_set_default_command(self):
+        """
+        python -m unittest tests.test_cmd.SetDefaultCommandUnitTests.test_set_default_command
+        """
+        with ArgvContext(program, '-p', 'dev'):
+            cli.main()
+        cred = cli.utils.read_config(self.credentials.name)
+        self.assertEqual(cred['dev']['aws_session_token'], 'VeryLongBase664String==')
+
+        with ArgvContext(program, 'set-default', 'dev'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+
+        cred = cli.utils.read_config(self.credentials.name)
+        self.assertEqual(cred['default']['aws_session_token'], cred['dev']['aws_session_token'])
+        self.assertEqual(cred['default']['aws_access_key_id'], cred['dev']['aws_access_key_id'])
+
+    def test_set_default_command_profile_not_found(self):
+        """
+        python -m unittest tests.test_cmd.SetDefaultCommandUnitTests.test_set_default_command_profile_not_found
+        """
+        with ArgvContext(program, 'set-default', 'nonexistent'), self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+
 class EncryptCommandUnitTests(CLIUnitTests):
 
     @patch("sys.stdin", StringIO("Hello\n"))
