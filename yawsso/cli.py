@@ -69,6 +69,7 @@ def parser():
 
     parser_login(sp)
     parser_auto(sp)
+    parser_set_default(sp)
 
     sp.add_parser("encrypt", help=f"Encrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
     sp.add_parser("decrypt", help=f"Decrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
@@ -97,6 +98,15 @@ def parser_auto(sp):
     auto_command.add_argument("-e", "--export-vars", help="Print out AWS ENV vars", action="store_true")
     auto_command.add_argument("--profile", help="Login profile (use `default` or `AWS_PROFILE` if absent)", metavar="")
     auto_command.add_argument("--this", action="store_true", help="Only sync this auto login profile")
+
+
+def parser_set_default(sp):
+    set_default_help = "Copy a named profile's credentials to the default profile"
+    set_default_command = sp.add_parser(
+        "set-default", description=set_default_help, help=set_default_help,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    set_default_command.add_argument("profile", help="Source profile name to copy to default")
 
 
 def verify_files_exist():
