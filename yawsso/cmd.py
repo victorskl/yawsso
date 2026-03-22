@@ -39,6 +39,9 @@ class Command(object):
         elif self.args.command == "decrypt":
             DecryptCommand(self).perform()
 
+        elif self.args.command in ("set-default", "sd"):
+            SetDefaultCommand(self).perform()
+
         elif self.args.command == "login":
             LoginCommand(self).perform().handle()
 
@@ -54,6 +57,32 @@ class CommandAction(ABC):
     @abstractmethod
     def perform(self):
         pass  # pragma: no cover
+
+
+class SetDefaultCommand(CommandAction):
+
+    def __init__(self, co):
+        super().__init__(co)
+        self.source_profile = co.args.profile
+
+    def perform(self):
+        config = utils.read_config(core.aws_shared_credentials_file)
+
+        if not config.has_section(self.source_profile):
+            utils.halt(f"Profile `{self.source_profile}` not found in {core.aws_shared_credentials_file}. "
+                       f"Sync it first with: yawsso -p {self.source_profile}")
+
+        source_items = dict(config.items(self.source_profile))
+
+        if config.has_section("default"):
+            config.remove_section("default")
+        config.add_section("default")
+
+        for key, value in source_items.items():
+            config.set("default", key, value)
+
+        utils.write_config(core.aws_shared_credentials_file, config)
+        exit(0)
 
 
 class EncryptCommand(CommandAction):

@@ -234,6 +234,21 @@ export AWS_PROFILE=dev
 yawsso auto
 ```
 
+### Set Default
+
+- You can copy a named profile's credentials to the `default` profile in `$HOME/.aws/credentials`:
+
+```
+yawsso set-default dev
+```
+
+- Or use the short alias `sd`:
+```
+yawsso sd dev
+```
+
+- This is useful when the `default` profile has no SSO configuration but your tools rely on it.
+
 ### Set Region
 
 - You can also set region from the config file to the shared credentials file
