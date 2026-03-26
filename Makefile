@@ -12,11 +12,6 @@ codeql:
 	@codeql database create --source-root yawsso/ --language=python local/codeqldb --overwrite
 	@codeql query run -d local/codeqldb/ ~/Projects/oss/codeql/python/ql/src/Security/CWE-312/CleartextLogging.ql
 
-codeclimate:
-	@codeclimate analyze yawsso
-
-cc: codeclimate
-
 test:
 	@py.test
 

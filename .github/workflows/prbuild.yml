@@ -14,7 +14,6 @@ on:
 #  https://github.com/actions/setup-python
 #  https://github.com/marketplace/actions/codecov
 #  https://github.com/marketplace/actions/code-climate-coverage-action
-#  https://docs.codeclimate.com/docs/github-actions-test-coverage
 #  https://github.com/marketplace/actions/trufflehog-oss
 
 jobs:
@@ -70,14 +69,6 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           name: yawsso
-
-      - name: Publish coverage to CodeClimate
-        uses: paambaati/codeclimate-action@v9.0.0
-        env:
-          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-        with:
-          coverageLocations: |
-            ${{ github.workspace }}/coverage.xml:coverage.py
 
       - name: Publish coverage to Coveralls
         env:
