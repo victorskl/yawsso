@@ -45,8 +45,6 @@ setup(
             "setuptools",
             "wheel",
             "build",
-            "aws-cdk-lib",
-            "constructs",
             "tox",
             "nose2",
             "pre-commit",
