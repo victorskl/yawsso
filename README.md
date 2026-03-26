@@ -1,14 +1,10 @@
 # yawsso
 
-[![DOI](https://zenodo.org/badge/267410733.svg)](https://zenodo.org/badge/latestdoi/267410733)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13893205.svg)](https://doi.org/10.5281/zenodo.13893205)
 [![Pull Request Build Status](https://github.com/victorskl/yawsso/workflows/Pull%20Request%20Build/badge.svg)](https://github.com/victorskl/yawsso/actions/workflows/prbuild.yml) 
 [![CodeQL](https://github.com/victorskl/yawsso/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/victorskl/yawsso/actions/workflows/codeql-analysis.yml) 
 [![codecov.io](https://codecov.io/gh/victorskl/yawsso/coverage.svg?branch=main)](https://codecov.io/gh/victorskl/yawsso?branch=main)
 [![coveralls.io](https://coveralls.io/repos/github/victorskl/yawsso/badge.svg?branch=main)](https://coveralls.io/github/victorskl/yawsso?branch=main)
-[![codeclimate - Test Coverage](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/test_coverage)](https://codeclimate.com/github/victorskl/yawsso/test_coverage)
-[![codeclimate - Maintainability](https://api.codeclimate.com/v1/badges/44dd1cbae44465118742/maintainability)](https://codeclimate.com/github/victorskl/yawsso/maintainability)
-[![snyk](https://snyk.io/advisor/python/yawsso/badge.svg)](https://snyk.io/advisor/python/yawsso) 
-[![kandi](https://img.shields.io/badge/kandi-X--Ray%20Report-ff69b4)](https://kandi.openweaver.com/python/victorskl/yawsso) 
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/yawsso?style=flat)](https://pypistats.org/packages/yawsso) 
 [![PyPI](https://img.shields.io/pypi/v/yawsso?style=flat)](https://pypi.org/project/yawsso)
 [![PyPI - License](https://img.shields.io/pypi/l/yawsso?style=flat)](https://opensource.org/licenses/MIT)
