@@ -13,7 +13,6 @@ on:
 #  https://github.com/actions/checkout
 #  https://github.com/actions/setup-python
 #  https://github.com/marketplace/actions/codecov
-#  https://github.com/marketplace/actions/code-climate-coverage-action
 #  https://github.com/marketplace/actions/trufflehog-oss
 
 jobs:
@@ -26,21 +25,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+        python-version: [ '3.10', '3.11', '3.12', '3.13', '3.14' ]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@v3.82.6
+        uses: trufflesecurity/trufflehog@v3.94.1
         with:
           extra_args: --only-verified
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -62,11 +61,11 @@ jobs:
           xvfb-run pytest --cov-report xml --cov=yawsso tests/
 
       - name: Publish coverage to to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6.0.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           flags: unittests
           name: yawsso
 
