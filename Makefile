@@ -1,6 +1,5 @@
 install:
 	@pip install ".[dev,test]" .
-	@pnpm install
 	@pre-commit install
 
 check:
@@ -29,14 +28,6 @@ tox:
 
 nose:
 	@nose2 -vv
-
-tf:
-	@AWS_PROFILE=dev terraform refresh
-
-smoke:
-	@terraform plan
-	@npx cdk synth --app "python cdk.py" --profile dev
-	@AWS_PROFILE=dev cw ls groups
 
 .PHONY: doc
 doc:
