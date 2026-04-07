@@ -27,6 +27,16 @@ Yet Another AWS SSO - sync up AWS CLI v2 SSO login session to legacy CLI v1 cred
 pip install yawsso
 ```
 
+- Or install globally with [uv](https://docs.astral.sh/uv/):
+```commandline
+uv tool install yawsso
+```
+
+- Or add to a project:
+```commandline
+uv add yawsso
+```
+
 - Do your per normal SSO login and, have at least one active SSO session cache:
 ```commandline
 aws sso login --profile dev
