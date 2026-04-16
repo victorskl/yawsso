@@ -42,6 +42,9 @@ class Command(object):
         elif self.args.command in ("set-default", "sd"):
             SetDefaultCommand(self).perform()
 
+        elif self.args.command in ("show-account-id", "sid"):
+            ShowAccountIdCommand(self).perform()
+
         elif self.args.command == "login":
             LoginCommand(self).perform().handle()
 
@@ -82,6 +85,23 @@ class SetDefaultCommand(CommandAction):
             config.set("default", key, value)
 
         utils.write_config(core.aws_shared_credentials_file, config)
+        exit(0)
+
+
+class ShowAccountIdCommand(CommandAction):
+
+    def __init__(self, co):
+        super().__init__(co)
+        self.profile_name = co.args.profile
+
+    def perform(self):
+        profile = core.load_profile_from_config(self.profile_name, self.co.config)
+
+        sso_account_id = profile.get("sso_account_id")
+        if not sso_account_id:
+            utils.halt(f"Profile `{self.profile_name}` does not have `sso_account_id` configured.")
+
+        print(sso_account_id)
         exit(0)
 
 
