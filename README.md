@@ -255,6 +255,26 @@ yawsso sd dev
 
 - This is useful when the `default` profile has no SSO configuration but your tools rely on it.
 
+### Show Account ID
+
+- You can retrieve the `sso_account_id` associated with a given profile from `$HOME/.aws/config`:
+
+```
+yawsso show-account-id --profile qa
+123456789012
+```
+
+- Or use the short alias `sid`:
+```
+yawsso sid --profile qa
+123456789012
+```
+
+- The output is plain text, making it easy to consume in scripts or pipe into other tools:
+```
+export AWS_ACCOUNT_ID=$(yawsso sid --profile qa)
+```
+
 ### Set Region
 
 - You can also set region from the config file to the shared credentials file
