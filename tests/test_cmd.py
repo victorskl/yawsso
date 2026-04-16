@@ -52,6 +52,49 @@ class SetDefaultCommandUnitTests(CLIUnitTests):
         self.assertEqual(x.exception.code, 1)
 
 
+class ShowAccountIdCommandUnitTests(CLIUnitTests):
+
+    def test_show_account_id_command(self):
+        """
+        python -m unittest tests.test_cmd.ShowAccountIdCommandUnitTests.test_show_account_id_command
+        """
+        with ArgvContext(program, 'show-account-id', '--profile', 'dev'), \
+                self.assertRaises(SystemExit) as x, \
+                patch('sys.stdout', new_callable=StringIO) as stdout:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+        self.assertEqual(stdout.getvalue().strip(), '123456789')
+
+    def test_show_account_id_command_alias(self):
+        """
+        python -m unittest tests.test_cmd.ShowAccountIdCommandUnitTests.test_show_account_id_command_alias
+        """
+        with ArgvContext(program, 'sid', '--profile', 'dev'), \
+                self.assertRaises(SystemExit) as x, \
+                patch('sys.stdout', new_callable=StringIO) as stdout:
+            cli.main()
+        self.assertEqual(x.exception.code, 0)
+        self.assertEqual(stdout.getvalue().strip(), '123456789')
+
+    def test_show_account_id_profile_not_found(self):
+        """
+        python -m unittest tests.test_cmd.ShowAccountIdCommandUnitTests.test_show_account_id_profile_not_found
+        """
+        with ArgvContext(program, 'show-account-id', '--profile', 'nonexistent'), \
+                self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+    def test_show_account_id_missing_field(self):
+        """
+        python -m unittest tests.test_cmd.ShowAccountIdCommandUnitTests.test_show_account_id_missing_field
+        """
+        with ArgvContext(program, 'show-account-id', '--profile', 'zzz'), \
+                self.assertRaises(SystemExit) as x:
+            cli.main()
+        self.assertEqual(x.exception.code, 1)
+
+
 class EncryptCommandUnitTests(CLIUnitTests):
 
     @patch("sys.stdin", StringIO("Hello\n"))
