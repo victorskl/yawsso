@@ -70,6 +70,7 @@ def parser():
     parser_login(sp)
     parser_auto(sp)
     parser_set_default(sp)
+    parser_show_account_id(sp)
 
     sp.add_parser("encrypt", help=f"Encrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
     sp.add_parser("decrypt", help=f"Decrypt ({Constant.ROT_13.value.upper()}) stdin and exit")
@@ -107,6 +108,15 @@ def parser_set_default(sp):
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     set_default_command.add_argument("profile", help="Source profile name to copy to default")
+
+
+def parser_show_account_id(sp):
+    show_account_id_help = "Show the sso_account_id for a given profile"
+    show_account_id_command = sp.add_parser(
+        "show-account-id", aliases=["sid"], description=show_account_id_help, help=show_account_id_help,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    show_account_id_command.add_argument("--profile", required=True, help="Profile name", metavar="")
 
 
 def verify_files_exist():
