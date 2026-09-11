@@ -683,6 +683,58 @@ class CLIUnitTests(TestCase):
         self.assertEqual(new_tok, 'VeryLongBase664String==')
         verify(cli.utils, times=4).invoke(...)
 
+    def test_source_profile_eager_sync_doubled_utc_offset(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_source_profile_eager_sync_doubled_utc_offset
+        """
+        # source profile credentials written by yawsso v1.2.1 through v1.4.0 carry a doubled UTC offset
+        # in aws_session_expiration and must not crash the eager sync parse
+        with ArgvContext(program, '-t', '-p', 'dev'):
+            self.credentials.close()
+            os.unlink(self.credentials.name)
+            self.credentials = tempfile.NamedTemporaryFile(delete=False)
+            cred_ini = b"""
+            [default]
+            region = ap-southeast-2
+            aws_access_key_id = MOCK
+            aws_secret_access_key  = MOCK
+            aws_session_token = tok
+            aws_session_expiration = 2020-05-27T18:21:43+00:00+0000
+            """
+            self.credentials.write(cred_ini)
+            self.credentials.seek(0)
+            self.credentials.read()
+            cli.core.aws_shared_credentials_file = self.credentials.name
+
+            self.config.close()
+            os.unlink(self.config.name)
+            # now start new test case
+            self.config = tempfile.NamedTemporaryFile(delete=False)
+            conf_ini = b"""
+            [default]
+            sso_start_url = https://petshop.awsapps.com/start
+            sso_region = ap-southeast-2
+            sso_account_id = 123456789
+            sso_role_name = Engineering
+            region = ap-southeast-2
+            output = json
+
+            [profile dev]
+            role_arn = arn:aws:iam::456789123:role/FullAdmin
+            source_profile = default
+            region = ap-southeast-2
+            output = json
+            """
+            self.config.write(conf_ini)
+            self.config.seek(0)
+            self.config.read()
+            cli.core.aws_config_file = self.config.name
+            cli.main()
+        cred = cli.utils.read_config(self.credentials.name)
+        new_tok = cred['dev']['aws_session_token']
+        self.assertNotEqual(new_tok, 'tok')
+        self.assertEqual(new_tok, 'VeryLongBase664String==')
+
     def test_eager_sync_source_profile_should_skip(self):
         """
         python -m unittest tests.test_cli.CLIUnitTests.test_eager_sync_source_profile_should_skip
@@ -829,6 +881,41 @@ class CLIUnitTests(TestCase):
         """
         expires_utc = cli.core.parse_credentials_file_session_expiry("2020-06-14T17:13:26+0000")
         self.assertIsNotNone(expires_utc)
+
+    def test_parse_credentials_file_session_expiry_doubled_utc_offset(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_parse_credentials_file_session_expiry_doubled_utc_offset
+        """
+        # yawsso v1.2.1 through v1.4.0 wrote aws_session_expiration with a doubled UTC offset
+        expected = datetime(2020, 6, 14, 17, 13, 26, tzinfo=timezone.utc)
+        expires_utc = cli.core.parse_credentials_file_session_expiry("2020-06-14T17:13:26+00:00+0000")
+        self.assertEqual(expires_utc, expected)
+
+    def test_parse_credentials_file_session_expiry_fractional_seconds(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_parse_credentials_file_session_expiry_fractional_seconds
+        """
+        expected = datetime(2020, 6, 14, 17, 13, 26, tzinfo=timezone.utc)
+        expires_utc = cli.core.parse_credentials_file_session_expiry("2020-06-14T17:13:26.123456+0000")
+        self.assertEqual(expires_utc, expected)
+        expires_utc = cli.core.parse_credentials_file_session_expiry("2020-06-14T17:13:26.123456+00:00+0000")
+        self.assertEqual(expires_utc, expected)
+
+    def test_update_aws_cli_v1_credentials_expiration_round_trip(self):
+        """
+        python -m unittest tests.test_cli.CLIUnitTests.test_update_aws_cli_v1_credentials_expiration_round_trip
+        """
+        credentials = {
+            'accessKeyId': 'MOCK',
+            'secretAccessKey': 'MOCK',
+            'sessionToken': 'tok',
+            'expiration': 1592154806123.0  # 2020-06-14T17:13:26.123 UTC
+        }
+        cli.core.update_aws_cli_v1_credentials('dev', {'region': 'ap-southeast-2'}, credentials)
+        cred = cli.utils.read_config(self.credentials.name)
+        self.assertEqual(cred['dev']['aws_session_expiration'], '2020-06-14T17:13:26+0000')
+        expires_utc = cli.core.parse_credentials_file_session_expiry(cred['dev']['aws_session_expiration'])
+        self.assertEqual(expires_utc, datetime(2020, 6, 14, 17, 13, 26, tzinfo=timezone.utc))
 
     def test_version_flag(self):
         """

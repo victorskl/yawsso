@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import re
 from configparser import NoSectionError
 from datetime import datetime, timezone
 
@@ -48,7 +49,7 @@ def update_aws_cli_v1_credentials(profile_name, profile, credentials):
 
     # set expiration
     ts_expires_millisecond = credentials["expiration"]
-    dt_utc = str(datetime.fromtimestamp(ts_expires_millisecond / 1000.0, timezone.utc).isoformat() + '+0000')
+    dt_utc = datetime.fromtimestamp(ts_expires_millisecond / 1000.0, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
     config.set(profile_name, "aws_session_expiration", dt_utc)
 
     # set region
@@ -71,6 +72,9 @@ def parse_assume_role_credentials_expiry(dt_str):
 
 def parse_credentials_file_session_expiry(dt_str):
     datetime_format_in_cred_file_aws_session_expiration = "%Y-%m-%dT%H:%M:%S+0000"  # 2020-06-14T17:13:26+0000
+    # tolerate values written by v1.2.1 to v1.4.0: doubled UTC offset e.g. ...T17:13:26+00:00+0000
+    # and fractional seconds e.g. ...T17:13:26.123456+0000
+    dt_str = re.sub(r"\.\d+", "", dt_str).replace("+00:00+0000", "+0000")
     expires_utc = datetime.strptime(dt_str, datetime_format_in_cred_file_aws_session_expiration)
     expires_utc = expires_utc.replace(tzinfo=timezone.utc)
     return expires_utc
